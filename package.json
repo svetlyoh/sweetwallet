@@ -1,0 +1,16 @@
+{
+	"name": "sweetwallet",
+	"scripts": {
+		"dev": "node server.js",
+		"dev:https": "node server.js --https",
+		"cert:local": "node scripts/create-local-cert-instructions.js",
+		"start": "node server.js",
+		"test": "node --test"
+	},
+	"engines": {
+		"node": ">=18"
+	},
+	"dependencies": {
+		"bitcoinjs-lib": "^4.0.3"
+	}
+}

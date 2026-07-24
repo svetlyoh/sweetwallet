@@ -1,0 +1,531 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge">
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+		<title>SweetWallet</title>
+		<meta name="description" content="A mobile-first Sugarchain web wallet for creating, opening, receiving, sending, and broadcasting SUGAR transactions.">
+		<meta property="og:site_name" content="SweetWallet">
+		<meta property="og:title" content="SweetWallet">
+		<meta property="og:description" content="A mobile Sugarchain wallet with client-side signing and live SUGAR balances.">
+		<meta property="og:type" content="website">
+		<meta name="theme-color" content="#00452b">
+		<link rel="icon" href="/favicon.ico" sizes="any">
+		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+		<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+		<link rel="manifest" href="/site.webmanifest">
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+		<link rel="stylesheet" href="sweetwallet.css">
+	</head>
+	<body>
+		<div class="shell">
+			<header class="app-header">
+				<div class="brand">
+					<div class="brand-mark sweetwallet-mark sweetwallet-mark-small" aria-hidden="true">
+						<img src="images/sugarchainlogo.png" alt="">
+						<span>SweetWallet</span>
+					</div>
+					<div class="brand-text">
+						<h1 class="brand-title">SweetWallet</h1>
+						<p class="brand-subtitle">Sugarchain mobile wallet</p>
+					</div>
+				</div>
+				<div class="header-actions">
+					<button id="refreshBalance" class="balance-chip" type="button" title="Refresh live balance">
+						<span id="balanceChipAmount" class="amount">0</span>
+						<span id="balanceChipTicker" class="ticker">SUGAR</span>
+					</button>
+					<button id="menuToggle" class="icon-button" type="button" aria-label="Open menu" aria-expanded="false">
+						<i data-lucide="menu"></i>
+					</button>
+				</div>
+			</header>
+
+			<main>
+				<section id="loginScreen" class="screen active">
+					<div class="login-card">
+						<div class="login-title-row">
+							<div>
+								<p class="login-copy">Unlock a saved wallet, or use a private key for this session.</p>
+							</div>
+							<button id="createWallet" class="new-wallet-button" type="button" aria-label="Create new wallet">
+								<i data-lucide="circle-plus"></i>
+								<span>New</span>
+							</button>
+						</div>
+
+						<form id="loginForm" autocomplete="off">
+							<div id="savedWalletInfo" class="notice saved-wallet-note hidden">
+								Saved wallet: <strong id="savedWalletAddress" class="break-anywhere">None</strong>
+							</div>
+							<div class="login-field-row">
+								<div id="pinEntryWrap" class="form-row">
+									<label id="loginSecretLabel" for="loginSecret">Quick-unlock PIN</label>
+									<div id="pinEntry" class="pin-entry" role="button" tabindex="0" aria-label="Enter six digit PIN">
+										<span class="pin-box"></span>
+										<span class="pin-box"></span>
+										<span class="pin-box"></span>
+										<span class="pin-box"></span>
+										<span class="pin-box"></span>
+										<span class="pin-box"></span>
+									</div>
+									<input id="pinInput" class="pin-input" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" aria-hidden="true">
+								</div>
+								<div class="login-mode-toggle" role="group" aria-label="Login method">
+									<span class="mode-slider" aria-hidden="true"></span>
+									<button class="mode-pill active" type="button" data-login-mode="pin">PIN</button>
+									<button class="mode-pill" type="button" data-login-mode="password">Password</button>
+									<button class="mode-pill" type="button" data-login-mode="privateKey">Private key</button>
+								</div>
+								<div id="loginSecretWrap" class="form-row login-secret-wrap hidden">
+									<label id="loginTextLabel" for="loginSecret">Wallet password</label>
+									<input id="loginSecret" type="password" inputmode="text" autocomplete="off" placeholder="Enter wallet password">
+								</div>
+							</div>
+							<button id="loginSubmit" class="button" type="submit">
+								<i data-lucide="unlock"></i>
+								Log In
+							</button>
+						</form>
+
+						<div id="createdCard" class="notice warning hidden">
+							<label for="createdKey">Generated private key</label>
+							<div class="field-pair">
+								<input id="createdKey" class="monospace" type="password" readonly autocomplete="off">
+								<button class="copy-button" type="button" data-copy-target="#createdKey" aria-label="Copy generated private key">
+									<i data-lucide="copy"></i>
+								</button>
+							</div>
+						</div>
+						<div class="notice login-helper-note">New wallets stay temporary until you save them in Security.</div>
+					</div>
+				</section>
+
+				<section id="walletScreen" class="screen">
+					<div class="wallet-layout">
+						<section class="primary-actions" aria-label="Primary wallet actions">
+							<button class="primary-action" type="button" data-tab="send">
+								<i data-lucide="send"></i>
+								<span>Send</span>
+							</button>
+							<button class="primary-action" type="button" data-tab="receive">
+								<i data-lucide="qr-code"></i>
+								<span>Receive</span>
+							</button>
+						</section>
+
+						<section class="wallet-card" aria-label="Wallet overview">
+							<div class="wallet-top">
+								<div>
+									<p class="wallet-label">Available balance</p>
+									<div class="wallet-balance-row">
+										<p class="wallet-balance"><span id="balanceMain">0.0000</span> <span>SUGAR</span></p>
+										<button id="toggleBalancePrecision" class="balance-expand" type="button" aria-expanded="false" aria-label="Show full balance">
+											<i data-lucide="chevrons-down-up"></i>
+										</button>
+									</div>
+								</div>
+								<div class="status-pill">
+									<i data-lucide="shield-check"></i>
+									<span id="walletStatus">Local key</span>
+								</div>
+							</div>
+						</section>
+
+						<section>
+							<div class="panel" data-panel="receive">
+								<div class="panel-title-row">
+									<button class="back-button" type="button" data-tab="activity" aria-label="Back to activity">
+										<i data-lucide="arrow-left"></i>
+									</button>
+									<h2>Receive SUGAR</h2>
+								</div>
+								<div id="receiveQr" class="qr-wrap"></div>
+								<div class="address-box">
+									<div class="address-line">
+										<div id="receiveAddress" class="address-value"></div>
+										<button id="copyReceive" class="copy-button" type="button" aria-label="Copy receive address">
+											<i data-lucide="copy"></i>
+										</button>
+									</div>
+								</div>
+							</div>
+
+							<div class="panel" data-panel="locked">
+								<h2>Wallet Locked</h2>
+								<div class="notice">Your saved wallet is locked. Activity and receive info can remain visible, but sending requires unlocking the encrypted private key.</div>
+								<form id="lockedPasswordForm" autocomplete="off">
+									<div class="form-row">
+										<label for="lockedPassword">Wallet password</label>
+										<input id="lockedPassword" type="password" autocomplete="current-password" placeholder="Enter your wallet password">
+									</div>
+									<button id="unlockLockedPassword" class="button" type="submit">
+										<i data-lucide="lock-keyhole-open"></i>
+										Unlock Wallet
+									</button>
+								</form>
+								<form id="lockedPinForm" class="security-compact hidden" autocomplete="off">
+									<div class="form-row">
+										<label for="lockedPin">Quick-unlock PIN</label>
+										<input id="lockedPin" type="password" inputmode="numeric" autocomplete="off" placeholder="6+ digit PIN">
+									</div>
+									<button id="unlockLockedPin" class="button subtle" type="submit">
+										<i data-lucide="hash"></i>
+										Unlock With PIN
+									</button>
+								</form>
+							</div>
+
+							<div class="panel active" data-panel="activity">
+								<div class="panel-title-row">
+									<h2>Activity</h2>
+									<button id="refreshActivity" class="copy-button" type="button" aria-label="Refresh activity">
+										<i data-lucide="refresh-cw"></i>
+									</button>
+								</div>
+								<div class="activity-summary">
+									<span id="activityCount">No transactions loaded</span>
+								</div>
+								<div id="activityList" class="activity-list">
+									<div class="activity-empty">Open Activity to load address transactions.</div>
+								</div>
+								<button id="loadMoreActivity" class="button subtle hidden" type="button">
+									<i data-lucide="list-plus"></i>
+									Load More
+								</button>
+							</div>
+
+							<div class="panel" data-panel="send">
+								<div class="panel-title-row">
+									<button class="back-button" type="button" data-tab="activity" aria-label="Back to activity">
+										<i data-lucide="arrow-left"></i>
+									</button>
+									<h2>Send SUGAR</h2>
+								</div>
+								<form id="sendForm" autocomplete="off">
+									<div class="field-grid">
+										<div>
+											<label for="sendAddress">Recipient</label>
+											<input id="sendAddress" type="text" inputmode="text" placeholder="sugar1... or sugarchain: URI">
+										</div>
+										<div>
+											<label for="sendAmount">Amount</label>
+											<div class="field-pair">
+												<input id="sendAmount" type="text" inputmode="decimal" placeholder="0.00000000">
+												<button id="sendMax" class="copy-button" type="button" aria-label="Use maximum amount">
+													<i data-lucide="maximize-2"></i>
+												</button>
+											</div>
+										</div>
+										<div>
+											<label for="sendFee">Fee</label>
+											<input id="sendFee" type="text" inputmode="decimal" value="0.00001">
+										</div>
+									</div>
+									<div class="notice">Available: <span id="sendAvailable">0 SUGAR</span></div>
+									<button class="button" type="submit">
+										<i data-lucide="check-circle"></i>
+										Review Send
+									</button>
+								</form>
+								<div id="sendSummary" class="send-summary">
+									<div class="summary-line"><span>To</span><strong id="summaryAddress" class="break-anywhere"></strong></div>
+									<div class="summary-line"><span>Amount</span><strong id="summaryAmount"></strong></div>
+									<div class="summary-line"><span>Fee</span><strong id="summaryFee"></strong></div>
+									<div class="summary-line"><span>Total</span><strong id="summaryTotal"></strong></div>
+								</div>
+								<div id="lastTxBox" class="notice hidden">Last transaction: <a id="lastTxLink" class="break-anywhere" href="#" target="_blank" rel="noopener"></a></div>
+							</div>
+
+							<div class="panel" data-panel="keys">
+								<h2>Wallet Keys</h2>
+								<div class="notice warning">Back up the WIF before closing SweetWallet. Anyone with this key can spend this wallet.</div>
+								<div class="key-field">
+									<label for="keyAddress">Address</label>
+									<div class="field-pair">
+										<input id="keyAddress" readonly>
+										<button class="copy-button" type="button" data-copy-target="#keyAddress" aria-label="Copy address key field">
+											<i data-lucide="copy"></i>
+										</button>
+									</div>
+								</div>
+								<div class="key-field">
+									<label for="keyPublic">Public key</label>
+									<div class="field-pair">
+										<input id="keyPublic" readonly>
+										<button class="copy-button" type="button" data-copy-target="#keyPublic" aria-label="Copy public key">
+											<i data-lucide="copy"></i>
+										</button>
+									</div>
+								</div>
+								<div class="key-field">
+									<label>Private key backup</label>
+									<div class="notice warning">Private-key export now requires reauthentication. Use Security & Wallet Access to open the backup screen.</div>
+									<button class="button subtle" type="button" data-tab="security">
+										<i data-lucide="shield-check"></i>
+										Open Security
+									</button>
+								</div>
+								<div class="key-field">
+									<label for="keyRedeem">SegWit redeem script</label>
+									<div class="field-pair">
+										<input id="keyRedeem" readonly>
+										<button class="copy-button" type="button" data-copy-target="#keyRedeem" aria-label="Copy redeem script">
+											<i data-lucide="copy"></i>
+										</button>
+									</div>
+								</div>
+							</div>
+
+							<div class="panel" data-panel="broadcast">
+								<h2>Broadcast Raw Transaction</h2>
+								<form id="broadcastForm" autocomplete="off">
+									<div class="form-row">
+										<label for="rawTx">Raw transaction hex</label>
+										<textarea id="rawTx" class="monospace" spellcheck="false" placeholder="Paste raw hex"></textarea>
+									</div>
+									<button id="broadcastButton" class="button" type="submit">
+										<i data-lucide="radio"></i>
+										Broadcast
+									</button>
+								</form>
+								<div id="broadcastResult" class="notice break-anywhere"></div>
+							</div>
+
+							<div class="panel" data-panel="settings">
+								<h2>Settings</h2>
+								<form id="backendForm" autocomplete="off">
+									<div class="form-row">
+										<label for="backendInput">Sugarchain API backend</label>
+										<input id="backendInput" type="url" inputmode="url">
+									</div>
+									<button id="backendButton" class="button" type="submit">
+										<i data-lucide="server"></i>
+										Switch Backend
+									</button>
+								</form>
+								<div class="form-row">
+									<label for="addressType">Receive address type</label>
+									<select id="addressType">
+										<option value="bech32">Native SegWit sugar1...</option>
+										<option value="segwit">Wrapped SegWit</option>
+										<option value="legacy">Legacy</option>
+									</select>
+								</div>
+								<div class="notice">Active backend: <span id="activeBackend"></span></div>
+							</div>
+
+							<div class="panel" data-panel="security">
+								<h2>Security & Wallet Access</h2>
+								<div id="securityStatus" class="notice">Security status loading...</div>
+								<div id="securityCapabilityNotice" class="notice warning">Saving the private key is optional. SweetWallet can keep this wallet session-only, or save it encrypted when this browser connection supports Web Crypto.</div>
+
+								<div class="security-stack">
+									<section class="security-group" aria-label="Wallet storage">
+										<h3>Wallet Storage</h3>
+										<form id="saveVaultForm" autocomplete="off">
+											<div class="form-row">
+												<label for="savePassword">New wallet password</label>
+												<input id="savePassword" type="password" autocomplete="new-password" placeholder="At least 10 characters">
+											</div>
+											<div class="form-row">
+												<label for="savePasswordConfirm">Confirm wallet password</label>
+												<input id="savePasswordConfirm" type="password" autocomplete="new-password">
+											</div>
+											<button id="saveVaultButton" class="button" type="submit">
+												<i data-lucide="database-lock"></i>
+												Save Private Key on This Device
+											</button>
+										</form>
+										<button id="sessionOnlyButton" class="button subtle" type="button">
+											<i data-lucide="monitor-x"></i>
+											Do Not Save Private Key
+										</button>
+										<button id="exportBackupButton" class="button subtle" type="button">
+											<i data-lucide="download"></i>
+											Export Wallet Backup
+										</button>
+										<div id="backupBox" class="secure-output hidden">
+											<label for="backupWif">Wallet backup private key</label>
+											<textarea id="backupWif" class="monospace" readonly spellcheck="false"></textarea>
+											<button id="copyBackupButton" class="button subtle" type="button">
+												<i data-lucide="copy"></i>
+												Copy Backup Private Key
+											</button>
+										</div>
+										<button id="removeSavedKeyButton" class="button subtle" type="button">
+											<i data-lucide="key-round"></i>
+											Remove Saved Private Key
+										</button>
+										<button id="watchOnlyButton" class="button subtle" type="button">
+											<i data-lucide="eye"></i>
+											Convert to Watch-Only Wallet
+										</button>
+										<button id="deleteWalletButton" class="button danger" type="button">
+											<i data-lucide="trash-2"></i>
+											Delete Wallet From Device
+										</button>
+									</section>
+
+									<section class="security-group" aria-label="Wallet lock">
+										<h3>Wallet Lock</h3>
+										<form id="changePasswordForm" autocomplete="off">
+											<div class="form-row">
+												<label for="currentPassword">Current wallet password</label>
+												<input id="currentPassword" type="password" autocomplete="current-password">
+											</div>
+											<div class="form-row">
+												<label for="newPassword">New wallet password</label>
+												<input id="newPassword" type="password" autocomplete="new-password">
+											</div>
+											<div class="form-row">
+												<label for="newPasswordConfirm">Confirm new password</label>
+												<input id="newPasswordConfirm" type="password" autocomplete="new-password">
+											</div>
+											<button id="changePasswordButton" class="button subtle" type="submit">
+												<i data-lucide="key"></i>
+												Change Wallet Password
+											</button>
+										</form>
+										<form id="pinForm" autocomplete="off">
+											<div class="form-row">
+												<label for="pinPassword">Wallet password</label>
+												<input id="pinPassword" type="password" autocomplete="current-password">
+											</div>
+											<div class="form-row">
+												<label for="quickPin">Quick-unlock PIN</label>
+												<input id="quickPin" type="password" inputmode="numeric" autocomplete="off" placeholder="6+ digits">
+											</div>
+											<button id="setPinButton" class="button subtle" type="submit">
+												<i data-lucide="hash"></i>
+												Set or Change Quick-Unlock PIN
+											</button>
+										</form>
+										<button id="disablePinButton" class="button subtle" type="button">
+											<i data-lucide="x-circle"></i>
+											Disable Quick-Unlock PIN
+										</button>
+										<div class="form-row">
+											<label for="autoLockTimeout">Auto-Lock Timeout</label>
+											<select id="autoLockTimeout">
+												<option value="0">Immediately</option>
+												<option value="60000">After 1 minute</option>
+												<option value="300000">After 5 minutes</option>
+												<option value="900000">After 15 minutes</option>
+												<option value="1800000">After 30 minutes</option>
+												<option value="-1">Never</option>
+											</select>
+										</div>
+										<button id="lockNowButton" class="button subtle" type="button">
+											<i data-lucide="lock"></i>
+											Lock Wallet Now
+										</button>
+										<label class="check-row disabled">
+											<input id="biometricsSetting" type="checkbox" disabled>
+											<span>Require Device Biometrics <small>Native app only</small></span>
+										</label>
+									</section>
+
+									<section class="security-group" aria-label="Security key">
+										<h3>Security Key</h3>
+										<div class="notice">Security Key Approval is optional. When enabled, a registered security key must approve the transaction before the wallet signs and broadcasts it.</div>
+										<label class="check-row">
+											<input id="securityKeyRequired" type="checkbox">
+											<span>Require YubiKey Before Sending</span>
+										</label>
+										<button id="addSecurityKeyButton" class="button subtle" type="button">
+											<i data-lucide="shield-plus"></i>
+											Add Security Key
+										</button>
+										<button id="addBackupSecurityKeyButton" class="button subtle" type="button">
+											<i data-lucide="shield-plus"></i>
+											Add Backup Security Key
+										</button>
+										<div id="securityKeyList" class="security-list"></div>
+										<button id="generateRecoveryCodesButton" class="button subtle" type="button">
+											<i data-lucide="ticket-check"></i>
+											Generate Recovery Codes
+										</button>
+										<div id="recoveryCodesBox" class="secure-output hidden">
+											<label for="recoveryCodesOutput">Recovery codes</label>
+											<textarea id="recoveryCodesOutput" class="monospace" readonly spellcheck="false"></textarea>
+											<div class="notice warning">Store these codes offline. SweetWallet stores only hashes and will not show these codes again.</div>
+										</div>
+									</section>
+
+									<section class="security-group" aria-label="Send security">
+										<h3>Send Security</h3>
+										<label class="check-row">
+											<input id="requirePasswordBeforeSend" type="checkbox">
+											<span>Require Wallet Password Before Sending</span>
+										</label>
+										<label class="check-row">
+											<input id="requirePinBeforeSend" type="checkbox">
+											<span>Require PIN Before Sending</span>
+										</label>
+										<label class="check-row disabled">
+											<input id="requireBiometricsBeforeSend" type="checkbox" disabled>
+											<span>Require Biometrics Before Sending <small>Native app only</small></span>
+										</label>
+										<label class="check-row">
+											<input id="requireSecurityKeyBeforeSend" type="checkbox">
+											<span>Require YubiKey Before Sending</span>
+										</label>
+										<label class="check-row">
+											<input id="requireConfirmEveryTx" type="checkbox">
+											<span>Require Confirmation for Every Transaction</span>
+										</label>
+									</section>
+								</div>
+							</div>
+						</section>
+					</div>
+				</section>
+			</main>
+		</div>
+
+		<div id="menuSheet" class="menu-sheet" aria-hidden="true">
+			<div id="menuBackdrop" class="menu-backdrop"></div>
+			<div class="menu-panel" role="dialog" aria-label="SweetWallet menu">
+				<div class="menu-title">
+					<span>SweetWallet</span>
+					<button id="menuClose" class="icon-button" type="button" aria-label="Close menu">
+						<i data-lucide="x"></i>
+					</button>
+				</div>
+				<div class="menu-items">
+					<button class="menu-item" type="button" data-tab="activity"><i data-lucide="list"></i>Activity</button>
+					<button class="menu-item" type="button" data-tab="keys"><i data-lucide="key-round"></i>Keys</button>
+					<button class="menu-item" type="button" data-tab="broadcast"><i data-lucide="radio"></i>Broadcast</button>
+					<button class="menu-item" type="button" data-tab="settings"><i data-lucide="settings"></i>Settings</button>
+					<button class="menu-item" type="button" data-tab="security"><i data-lucide="shield-check"></i>Security & Wallet Access</button>
+					<button id="logoutButton" class="menu-item danger" type="button"><i data-lucide="log-out"></i>Logout</button>
+				</div>
+			</div>
+		</div>
+
+		<div id="confirmModal" class="modal" role="dialog" aria-modal="true" aria-label="Confirm transaction">
+			<div class="modal-card">
+				<h2>Confirm Send</h2>
+				<div class="notice warning">Only broadcast after you have checked the recipient, amount, and fee.</div>
+				<div class="modal-actions">
+					<button id="cancelSend" class="button secondary" type="button">Cancel</button>
+					<button id="confirmSend" class="button" type="button">Sign & Broadcast</button>
+				</div>
+			</div>
+		</div>
+
+		<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.qrcode/1.0/jquery.qrcode.min.js"></script>
+		<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+		<script src="lib/bitcoinjs-4.0.3-browser.js"></script>
+		<script src="wallet-vault.js"></script>
+		<script src="sweetwallet.js"></script>
+	</body>
+</html>
