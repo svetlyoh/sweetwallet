@@ -1,4 +1,5 @@
 import bitcoin from 'bitcoinjs-lib';
+import { Buffer } from 'node:buffer';
 
 const sugarDecimals = 8;
 const faucetAmountSatoshis = 2500000;
@@ -148,7 +149,7 @@ function buildFaucetTransaction(keys, recipientAddress, utxos, amountSatoshis, f
 		const txid = utxo.txid;
 		const index = utxo.index !== undefined ? utxo.index : utxo.vout;
 		const scriptHex = String(utxo.script || utxo.scriptPubKey || (utxo.scriptPubKey && utxo.scriptPubKey.hex) || '');
-		const script = bitcoin.Buffer.from(scriptHex, 'hex');
+		const script = Buffer.from(scriptHex, 'hex');
 		const type = getScriptType(script);
 		totalValue += Number(utxo.value || 0);
 		if (type === 'bech32') {
