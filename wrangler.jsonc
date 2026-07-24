@@ -10,6 +10,12 @@
 		"directory": ".",
 		"binding": "ASSETS"
 	},
+	"routes": [
+		{
+			"pattern": "sweetwallet.net",
+			"custom_domain": true
+		}
+	],
 	"vars": {
 		"SWEETWALLET_FUNDING_ADDRESS": "sugar1q39n666w687nxm9x98tx5kgw2uvk780gtmd6yyu",
 		"SWEETWALLET_STARTER_FUNDING_ENABLED": "true",
