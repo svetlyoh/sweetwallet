@@ -261,6 +261,7 @@ button {
 }
 
 #pinEntryWrap,
+#lockedPinEntryWrap,
 .login-secret-wrap {
 	min-height: 112px;
 	margin-bottom: 0;
@@ -313,6 +314,14 @@ button {
 
 .login-mode-toggle[data-mode="privateKey"] .mode-slider {
 	transform: translateX(200%);
+}
+
+.locked-mode-toggle {
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.locked-mode-toggle .mode-slider {
+	width: calc((100% - 8px) / 2);
 }
 
 .mode-pill {
@@ -403,6 +412,41 @@ button {
 
 .login-card .notice.login-helper-note {
 	margin-top: 28px;
+}
+
+.panel.locked-panel {
+	padding: 0;
+	border: 0;
+	background: transparent;
+	box-shadow: none;
+}
+
+#walletScreen .panel.locked-panel {
+	padding: 0;
+	border: 0;
+	background: transparent;
+	box-shadow: none;
+}
+
+.locked-login-card {
+	margin-top: 0;
+}
+
+.locked-title-row {
+	display: block;
+}
+
+#walletScreen.wallet-locked .primary-actions,
+#walletScreen.wallet-locked .wallet-card {
+	display: none;
+}
+
+#walletScreen.wallet-locked .wallet-layout {
+	margin-top: 22px;
+}
+
+#walletScreen.wallet-locked .panel:not(.locked-panel) {
+	display: none;
 }
 
 .form-row {

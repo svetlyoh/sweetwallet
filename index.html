@@ -159,29 +159,49 @@
 								</div>
 							</div>
 
-							<div class="panel" data-panel="locked">
-								<h2>Wallet Locked</h2>
-								<div class="notice">Your saved wallet is locked. Activity and receive info can remain visible, but sending requires unlocking the encrypted private key.</div>
-								<form id="lockedPasswordForm" autocomplete="off">
-									<div class="form-row">
-										<label for="lockedPassword">Wallet password</label>
-										<input id="lockedPassword" type="password" autocomplete="current-password" placeholder="Enter your wallet password">
+							<div class="panel locked-panel" data-panel="locked">
+								<div class="login-card locked-login-card">
+									<div class="login-title-row locked-title-row">
+										<div>
+											<p class="login-copy">Unlock your saved wallet.</p>
+										</div>
 									</div>
-									<button id="unlockLockedPassword" class="button" type="submit">
-										<i data-lucide="lock-keyhole-open"></i>
-										Unlock Wallet
-									</button>
-								</form>
-								<form id="lockedPinForm" class="security-compact hidden" autocomplete="off">
-									<div class="form-row">
-										<label for="lockedPin">Quick-unlock PIN</label>
-										<input id="lockedPin" type="password" inputmode="numeric" autocomplete="off" placeholder="6+ digit PIN">
-									</div>
-									<button id="unlockLockedPin" class="button subtle" type="submit">
-										<i data-lucide="hash"></i>
-										Unlock With PIN
-									</button>
-								</form>
+
+									<form id="lockedUnlockForm" autocomplete="off">
+										<div class="notice saved-wallet-note locked-wallet-note">
+											Saved wallet: <strong id="lockedSavedWalletAddress" class="break-anywhere">None</strong>
+										</div>
+										<div class="login-field-row">
+											<div id="lockedPinEntryWrap" class="form-row">
+												<label for="lockedPinInput">Quick-unlock PIN</label>
+												<div id="lockedPinEntry" class="pin-entry" role="button" tabindex="0" aria-label="Enter six digit PIN">
+													<span class="pin-box"></span>
+													<span class="pin-box"></span>
+													<span class="pin-box"></span>
+													<span class="pin-box"></span>
+													<span class="pin-box"></span>
+													<span class="pin-box"></span>
+												</div>
+												<input id="lockedPinInput" class="pin-input" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" aria-hidden="true">
+											</div>
+											<div class="login-mode-toggle locked-mode-toggle" role="group" aria-label="Unlock method">
+												<span class="mode-slider" aria-hidden="true"></span>
+												<button class="mode-pill active" type="button" data-locked-mode="pin">PIN</button>
+												<button class="mode-pill" type="button" data-locked-mode="password">Password</button>
+											</div>
+											<div id="lockedPasswordWrap" class="form-row login-secret-wrap hidden">
+												<label for="lockedPassword">Wallet password</label>
+												<input id="lockedPassword" type="password" inputmode="text" autocomplete="current-password" placeholder="Enter wallet password">
+											</div>
+										</div>
+										<button id="unlockLockedSubmit" class="button hidden" type="submit">
+											<i data-lucide="lock-keyhole-open"></i>
+											Log In
+										</button>
+									</form>
+
+									<div class="notice login-helper-note">Your saved wallet is locked. Activity and receive info can remain visible, but sending requires unlocking the encrypted private key.</div>
+								</div>
 							</div>
 
 							<div class="panel active" data-panel="activity">

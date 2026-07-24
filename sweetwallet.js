@@ -45,6 +45,8 @@
 		mode: 'closed',
 		loginMode: 'pin',
 		pinSubmitting: false,
+		lockedUnlockMode: 'pin',
+		lockedPinSubmitting: false,
 		savedVault: null,
 		publicWallet: null,
 		settings: defaultSettings(),
@@ -819,11 +821,11 @@
 		if ($('#savedWalletAddress')) {
 			$('#savedWalletAddress').textContent = state.savedVault ? shortAddress(state.savedVault.address) : 'None';
 		}
-		$('#lockedPinForm').classList.toggle('hidden', !hasQuickPin(state.savedVault));
 		if (isLocked) {
 			$('#securityStatus').textContent = 'Wallet is locked. Unlock it before saving new credentials or sending.';
 		}
 		updateLoginUi();
+		updateLockedUi();
 	}
 
 	function setLoginMode(mode) {
@@ -846,7 +848,7 @@
 		if ($('#pinInput')) {
 			$('#pinInput').value = value;
 		}
-		$$('.pin-box').forEach(function (box, index) {
+		$$('#pinEntry .pin-box').forEach(function (box, index) {
 			box.classList.toggle('filled', index < value.length);
 		});
 	}
@@ -964,10 +966,133 @@
 		});
 	}
 
+	function lockedPinValue() {
+		return ($('#lockedPinInput') && $('#lockedPinInput').value || '').replace(/\D/g, '').slice(0, 6);
+	}
+
+	function updateLockedPinBoxes() {
+		var value = lockedPinValue();
+		if ($('#lockedPinInput')) {
+			$('#lockedPinInput').value = value;
+		}
+		$$('#lockedPinEntry .pin-box').forEach(function (box, index) {
+			box.classList.toggle('filled', index < value.length);
+		});
+	}
+
+	function focusLockedPinInput() {
+		var input = $('#lockedPinInput');
+		if (input) {
+			input.focus();
+		}
+	}
+
+	function setLockedUnlockMode(mode) {
+		if (['pin', 'password'].indexOf(mode) < 0) {
+			mode = 'pin';
+		}
+		state.lockedUnlockMode = mode;
+		if ($('#lockedPassword')) {
+			$('#lockedPassword').value = '';
+		}
+		if ($('#lockedPinInput')) {
+			$('#lockedPinInput').value = '';
+			updateLockedPinBoxes();
+		}
+		updateLockedUi();
+	}
+
+	function updateLockedUi() {
+		if (!$('#lockedUnlockForm')) {
+			return;
+		}
+		var hasPin = hasQuickPin(state.savedVault);
+		if (!hasPin && state.lockedUnlockMode === 'pin') {
+			state.lockedUnlockMode = 'password';
+		}
+		var pinWrap = $('#lockedPinEntryWrap');
+		var passwordWrap = $('#lockedPasswordWrap');
+		var submit = $('#unlockLockedSubmit');
+		var toggle = $('.locked-mode-toggle');
+		if (toggle) {
+			toggle.dataset.mode = state.lockedUnlockMode;
+		}
+		$$('[data-locked-mode]').forEach(function (button) {
+			var active = button.dataset.lockedMode === state.lockedUnlockMode;
+			button.classList.toggle('active', active);
+			button.disabled = button.dataset.lockedMode === 'pin' && !hasPin;
+			button.title = button.disabled ? 'Quick-unlock PIN is not enabled.' : '';
+		});
+		if ($('#lockedSavedWalletAddress')) {
+			$('#lockedSavedWalletAddress').textContent = state.savedVault ? shortAddress(state.savedVault.address) : 'None';
+		}
+		if (state.lockedUnlockMode === 'password') {
+			pinWrap.classList.add('hidden');
+			passwordWrap.classList.remove('hidden');
+			submit.classList.remove('hidden');
+		} else {
+			pinWrap.classList.remove('hidden');
+			passwordWrap.classList.add('hidden');
+			submit.classList.add('hidden');
+			updateLockedPinBoxes();
+		}
+		if (window.lucide) {
+			window.lucide.createIcons();
+		}
+	}
+
+	function submitLockedPin() {
+		if (state.lockedPinSubmitting) {
+			return;
+		}
+		var value = lockedPinValue();
+		if (value.length !== 6) {
+			return;
+		}
+		state.lockedPinSubmitting = true;
+		$('#lockedPinEntry').classList.add('active');
+		showToast('Unlocking...');
+		unlockSavedWithPin(value).then(function () {
+			$('#lockedPinInput').value = '';
+			updateLockedPinBoxes();
+		}).catch(function (error) {
+			$('#lockedPinInput').value = '';
+			updateLockedPinBoxes();
+			showToast(error.message || 'The password or PIN was not accepted.', 'danger');
+			window.setTimeout(focusLockedPinInput, 100);
+		}).finally(function () {
+			state.lockedPinSubmitting = false;
+			$('#lockedPinEntry').classList.remove('active');
+		});
+	}
+
+	function submitLockedUnlock() {
+		if (state.lockedUnlockMode === 'pin') {
+			submitLockedPin();
+			return;
+		}
+		var password = $('#lockedPassword').value.trim();
+		var button = $('#unlockLockedSubmit');
+		if (!password) {
+			showToast('Enter your wallet password.', 'danger');
+			return;
+		}
+		setBusy(button, true, 'Unlocking...');
+		unlockSavedWithPassword(password).then(function () {
+			$('#lockedPassword').value = '';
+		}).catch(function (error) {
+			showToast(error.message || 'Wallet could not be unlocked.', 'danger');
+		}).finally(function () {
+			setBusy(button, false);
+			updateLockedUi();
+		});
+	}
+
 	function updateWalletUi() {
 		var loggedIn = !!state.address;
 		$('#loginScreen').classList.toggle('active', !loggedIn);
 		$('#walletScreen').classList.toggle('active', loggedIn);
+		$('#walletScreen').classList.toggle('wallet-locked', state.mode === 'locked');
 		document.body.classList.toggle('wallet-open', loggedIn);
 		if (!loggedIn) {
 			updateAccessUi();
@@ -1145,6 +1270,7 @@
 		state.publicKeyHex = state.savedVault.publicKey || '';
 		state.walletId = state.savedVault.walletId || '';
 		state.mode = 'locked';
+		state.lockedUnlockMode = 'pin';
 		updateWalletUi();
 		switchTab('locked');
 		if (message) {
@@ -1388,7 +1514,7 @@
 		if ($('#savedWalletAddress')) {
 			$('#savedWalletAddress').textContent = vault ? shortAddress(vault.address) : 'None';
 		}
-		$('#lockedPinForm').classList.toggle('hidden', !hasQuickPin(vault));
+		updateLockedUi();
 		setDisabled('#addSecurityKeyButton', !webAuthnSupported(), 'Security-key approval requires HTTPS or localhost in a WebAuthn-capable browser.');
 		setDisabled('#addBackupSecurityKeyButton', !webAuthnSupported(), 'Security-key approval requires HTTPS or localhost in a WebAuthn-capable browser.');
 		renderSecurityKeys();
@@ -2028,30 +2154,53 @@
 			submitLogin();
 		});
 
-		$('#lockedPasswordForm').addEventListener('submit', function (event) {
-			event.preventDefault();
-			var button = $('#unlockLockedPassword');
-			setBusy(button, true, 'Unlocking...');
-			unlockSavedWithPassword($('#lockedPassword').value).then(function () {
-				$('#lockedPassword').value = '';
-			}).catch(function (error) {
-				showToast(error.message || 'Wallet could not be unlocked.', 'danger');
-			}).finally(function () {
-				setBusy(button, false);
+		$$('[data-locked-mode]').forEach(function (button) {
+			button.addEventListener('click', function () {
+				if (button.disabled) {
+					return;
+				}
+				setLockedUnlockMode(button.dataset.lockedMode);
+				if (state.lockedUnlockMode === 'pin') {
+					focusLockedPinInput();
+				} else {
+					$('#lockedPassword').focus();
+				}
 			});
 		});
 
-		$('#lockedPinForm').addEventListener('submit', function (event) {
+		$('#lockedPinEntry').addEventListener('click', focusLockedPinInput);
+		$('#lockedPinEntry').addEventListener('keydown', function (event) {
+			if (/^\d$/.test(event.key)) {
+				event.preventDefault();
+				$('#lockedPinInput').value = (lockedPinValue() + event.key).slice(0, 6);
+				updateLockedPinBoxes();
+				if (lockedPinValue().length === 6) {
+					submitLockedPin();
+				}
+			} else if (event.key === 'Backspace') {
+				event.preventDefault();
+				$('#lockedPinInput').value = lockedPinValue().slice(0, -1);
+				updateLockedPinBoxes();
+			}
+		});
+		$('#lockedPinInput').addEventListener('input', function () {
+			updateLockedPinBoxes();
+			if (lockedPinValue().length === 6) {
+				submitLockedPin();
+			}
+		});
+		$('#lockedPinInput').addEventListener('focus', function () {
+			$('#lockedPinEntry').classList.add('active');
+		});
+		$('#lockedPinInput').addEventListener('blur', function () {
+			if (!state.lockedPinSubmitting) {
+				$('#lockedPinEntry').classList.remove('active');
+			}
+		});
+
+		$('#lockedUnlockForm').addEventListener('submit', function (event) {
 			event.preventDefault();
-			var button = $('#unlockLockedPin');
-			setBusy(button, true, 'Unlocking...');
-			unlockSavedWithPin($('#lockedPin').value).then(function () {
-				$('#lockedPin').value = '';
-			}).catch(function (error) {
-				showToast(error.message || 'The password or PIN was not accepted.', 'danger');
-			}).finally(function () {
-				setBusy(button, false);
-			});
+			submitLockedUnlock();
 		});
 
 		$('#menuToggle').addEventListener('click', openMenu);
