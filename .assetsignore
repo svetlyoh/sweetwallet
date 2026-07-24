@@ -28,6 +28,7 @@ package.json
 server.js
 SECURITY.md
 README.md
+cloudflare-worker.js
 wrangler.jsonc
 *.log
 *.pem

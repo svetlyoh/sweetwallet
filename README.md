@@ -32,6 +32,14 @@ Open:
 
 This repo includes `wrangler.jsonc` and `.assetsignore` so `npx wrangler deploy` uploads only the browser wallet assets, not `node_modules` or local development files.
 
+Starter funding on Cloudflare requires a Worker secret:
+
+```powershell
+npx wrangler secret put SWEETWALLET_FUNDING_WIF
+```
+
+The configured feeder wallet address is `sugar1q39n666w687nxm9x98tx5kgw2uvk780gtmd6yyu`.
+
 ## Safety
 
 SweetWallet does not fake balances, does not auto-broadcast user spend transactions, and does not send private keys or WIFs to a server. Back up the WIF shown in the Keys panel before closing a newly created wallet.

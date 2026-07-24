@@ -1,9 +1,19 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "sweetwallet",
+	"main": "cloudflare-worker.js",
 	"compatibility_date": "2026-07-24",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
 	"assets": {
-		"directory": "."
+		"directory": ".",
+		"binding": "ASSETS"
+	},
+	"vars": {
+		"SWEETWALLET_FUNDING_ADDRESS": "sugar1q39n666w687nxm9x98tx5kgw2uvk780gtmd6yyu",
+		"SWEETWALLET_STARTER_FUNDING_ENABLED": "true",
+		"SUGAR_API_URL": "https://api.sugar.wtf"
 	},
 	"observability": {
 		"enabled": true
