@@ -1223,6 +1223,21 @@ select:focus {
 	color: rgba(237, 255, 243, 0.86);
 }
 
+#walletScreen #lastTxLink {
+	color: rgba(237, 255, 243, 0.86);
+	font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+	font-size: 0.76rem;
+	font-weight: 700;
+	text-decoration: none;
+}
+
+#walletScreen #lastTxLink:hover,
+#walletScreen #lastTxLink:focus-visible {
+	color: #7be38f;
+	text-decoration: underline;
+	text-underline-offset: 3px;
+}
+
 #walletScreen .activity-empty {
 	border-color: rgba(132, 217, 150, 0.24);
 	background: rgba(1, 63, 39, 0.42);
@@ -1317,7 +1332,7 @@ select:focus {
 	align-items: end;
 	justify-content: center;
 	padding: 12px;
-	background: rgba(0, 18, 11, 0.5);
+	background: rgba(0, 18, 11, 0.72);
 }
 
 .modal.active {
@@ -1327,14 +1342,32 @@ select:focus {
 .modal-card {
 	width: min(100%, 452px);
 	padding: 16px;
+	border: 1px solid rgba(255, 255, 255, 0.16);
 	border-radius: 8px;
-	background: white;
+	background:
+		linear-gradient(160deg, rgba(123, 227, 143, 0.16), transparent 45%),
+		linear-gradient(145deg, #003723, #075d36);
+	color: white;
 	box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
 }
 
 .modal-card h2 {
 	margin: 0 0 10px;
+	color: rgba(255, 255, 255, 0.94);
 	font-size: 1.2rem;
+	font-weight: 800;
+}
+
+.modal-card .notice {
+	border: 1px solid rgba(132, 217, 150, 0.18);
+	background: rgba(1, 63, 39, 0.42);
+	color: rgba(237, 255, 243, 0.86);
+}
+
+.modal-card .notice.warning {
+	border-color: rgba(132, 217, 150, 0.2);
+	background: rgba(1, 63, 39, 0.5);
+	color: rgba(237, 255, 243, 0.9);
 }
 
 .modal-actions {
@@ -1342,6 +1375,27 @@ select:focus {
 	grid-template-columns: 1fr 1fr;
 	gap: 8px;
 	margin-top: 14px;
+}
+
+.modal-card .button {
+	background: #0c8d4b;
+	color: white;
+}
+
+.modal-card .button:hover,
+.modal-card .button:focus-visible {
+	background: #0b7f44;
+}
+
+.modal-card .button.secondary {
+	border: 1px solid rgba(132, 217, 150, 0.22);
+	background: rgba(1, 63, 39, 0.56);
+	color: rgba(237, 255, 243, 0.94);
+}
+
+.modal-card .button.secondary:hover,
+.modal-card .button.secondary:focus-visible {
+	background: rgba(1, 63, 39, 0.76);
 }
 
 .hidden {
