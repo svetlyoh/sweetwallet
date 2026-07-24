@@ -1,5 +1,7 @@
 # SweetWallet
 
+![SweetWallet preview](images/Sweetwallet_Pin.jpg)
+
 SweetWallet is a mobile-first Sugarchain web wallet focused on wallet-only behavior.
 
 ## Features
