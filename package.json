@@ -3,6 +3,8 @@
 	"scripts": {
 		"dev": "node server.js",
 		"dev:https": "node server.js --https",
+		"deploy": "npx wrangler deploy",
+		"preview": "npx wrangler dev",
 		"cert:local": "node scripts/create-local-cert-instructions.js",
 		"start": "node server.js",
 		"test": "node --test"

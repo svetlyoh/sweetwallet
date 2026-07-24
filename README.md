@@ -28,6 +28,10 @@ Open:
 
 `http://localhost:8080/#/`
 
+## Cloudflare Deploy
+
+This repo includes `wrangler.jsonc` and `.assetsignore` so `npx wrangler deploy` uploads only the browser wallet assets, not `node_modules` or local development files.
+
 ## Safety
 
 SweetWallet does not fake balances, does not auto-broadcast user spend transactions, and does not send private keys or WIFs to a server. Back up the WIF shown in the Keys panel before closing a newly created wallet.
