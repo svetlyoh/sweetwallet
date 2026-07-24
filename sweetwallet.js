@@ -826,6 +826,22 @@
 		}
 		updateLoginUi();
 		updateLockedUi();
+		updateMenuUi();
+	}
+
+	function updateMenuUi() {
+		var isLocked = state.mode === 'locked';
+		$$('#menuSheet .menu-item[data-tab]').forEach(function (button) {
+			button.disabled = isLocked;
+			button.title = isLocked ? 'Unlock the wallet to use this menu item.' : '';
+		});
+		if ($('#menuLockButton')) {
+			var canLock = !!state.keys && !!state.savedVault && state.mode === 'saved';
+			$('#menuLockButton').disabled = !canLock;
+			$('#menuLockButton').title = canLock ? '' :
+				(isLocked ? 'Wallet is already locked.' :
+					(!state.savedVault || state.mode === 'session' ? 'Save this wallet before locking.' : 'Unlock the wallet before locking.'));
+		}
 	}
 
 	function setLoginMode(mode) {
@@ -2016,6 +2032,7 @@
 	}
 
 	function openMenu() {
+		updateMenuUi();
 		$('#menuSheet').classList.add('active');
 		$('#menuToggle').setAttribute('aria-expanded', 'true');
 	}
@@ -2206,6 +2223,13 @@
 		$('#menuToggle').addEventListener('click', openMenu);
 		$('#menuClose').addEventListener('click', closeMenu);
 		$('#menuBackdrop').addEventListener('click', closeMenu);
+
+		$('#menuLockButton').addEventListener('click', function () {
+			if ($('#menuLockButton').disabled) {
+				return;
+			}
+			lockWallet('Wallet locked.');
+		});
 
 		$$('[data-tab]').forEach(function (button) {
 			button.addEventListener('click', function () {

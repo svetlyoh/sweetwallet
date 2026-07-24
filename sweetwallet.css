@@ -1368,6 +1368,11 @@ select:focus {
 	color: #ffe8e6;
 }
 
+.menu-item[disabled] {
+	cursor: not-allowed;
+	opacity: 0.42;
+}
+
 .modal {
 	position: fixed;
 	inset: 0;
