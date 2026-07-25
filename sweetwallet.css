@@ -1426,6 +1426,10 @@ select:focus {
 	margin-top: 14px;
 }
 
+.modal-actions.single {
+	grid-template-columns: 1fr;
+}
+
 .modal-card .button {
 	background: #0c8d4b;
 	color: white;
@@ -1445,6 +1449,37 @@ select:focus {
 .modal-card .button.secondary:hover,
 .modal-card .button.secondary:focus-visible {
 	background: rgba(1, 63, 39, 0.76);
+}
+
+.qr-scanner-card {
+	display: grid;
+	gap: 12px;
+}
+
+.qr-video-frame {
+	position: relative;
+	overflow: hidden;
+	border: 1px solid rgba(132, 217, 150, 0.22);
+	border-radius: 8px;
+	background: rgba(1, 23, 15, 0.82);
+	aspect-ratio: 1;
+}
+
+.qr-video-frame video {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.qr-scan-frame {
+	position: absolute;
+	inset: 14%;
+	border: 2px solid rgba(123, 227, 143, 0.86);
+	border-radius: 8px;
+	box-shadow:
+		0 0 0 999px rgba(0, 18, 11, 0.28),
+		0 0 22px rgba(123, 227, 143, 0.22);
 }
 
 .hidden {

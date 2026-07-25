@@ -67,6 +67,13 @@
 			total: 0,
 			records: []
 		},
+		qrScanner: {
+			active: false,
+			stream: null,
+			frame: 0,
+			detecting: false,
+			lastInvalid: ''
+		},
 		starterFundingRequested: {}
 	};
 
@@ -551,6 +558,153 @@
 			address: value,
 			amount: ''
 		};
+	}
+
+	function qrScannerSupported() {
+		return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && (window.jsQR || window.BarcodeDetector));
+	}
+
+	function setQrScannerStatus(message, tone) {
+		var status = $('#qrScannerStatus');
+		if (!status) {
+			return;
+		}
+		status.textContent = message || '';
+		status.className = 'notice' + (tone ? ' ' + tone : '');
+	}
+
+	function fillRecipientFromQr(raw) {
+		var target = parsePaymentTarget(raw);
+		if (!validateAddress(target.address)) {
+			return false;
+		}
+		$('#sendAddress').value = target.address;
+		if (target.amount) {
+			$('#sendAmount').value = target.amount;
+		}
+		$('#sendAddress').dispatchEvent(new Event('input', { bubbles: true }));
+		stopQrScanner();
+		showToast('Recipient filled from QR.');
+		return true;
+	}
+
+	function decodeQrFromCanvas(canvas, imageData) {
+		if (window.jsQR) {
+			var result = window.jsQR(imageData.data, imageData.width, imageData.height, {
+				inversionAttempts: 'attemptBoth'
+			});
+			return Promise.resolve(result && result.data);
+		}
+		if (window.BarcodeDetector) {
+			if (!state.qrScanner.detector) {
+				state.qrScanner.detector = new window.BarcodeDetector({
+					formats: ['qr_code']
+				});
+			}
+			return state.qrScanner.detector.detect(canvas).then(function (codes) {
+				return codes && codes[0] && (codes[0].rawValue || codes[0].rawData);
+			});
+		}
+		return Promise.resolve('');
+	}
+
+	function scanQrFrame() {
+		if (!state.qrScanner.active) {
+			return;
+		}
+		var video = $('#qrScannerVideo');
+		var canvas = $('#qrScannerCanvas');
+		if (!video || !canvas) {
+			return;
+		}
+		if (video.readyState >= 2 && video.videoWidth && video.videoHeight && !state.qrScanner.detecting) {
+			canvas.width = video.videoWidth;
+			canvas.height = video.videoHeight;
+			var context = canvas.getContext('2d', { willReadFrequently: true });
+			context.drawImage(video, 0, 0, canvas.width, canvas.height);
+			var imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+			state.qrScanner.detecting = true;
+			decodeQrFromCanvas(canvas, imageData).then(function (text) {
+				if (!state.qrScanner.active || !text) {
+					return;
+				}
+				if (!fillRecipientFromQr(text) && text !== state.qrScanner.lastInvalid) {
+					state.qrScanner.lastInvalid = text;
+					setQrScannerStatus('QR found, but it is not a Sugarchain receive address.', 'warning');
+				}
+			}).catch(function () {
+				setQrScannerStatus('Could not read that QR. Try better light or move closer.', 'warning');
+			}).finally(function () {
+				state.qrScanner.detecting = false;
+				if (state.qrScanner.active) {
+					state.qrScanner.frame = window.requestAnimationFrame(scanQrFrame);
+				}
+			});
+			return;
+		}
+		state.qrScanner.frame = window.requestAnimationFrame(scanQrFrame);
+	}
+
+	function openQrScanner() {
+		if (!window.isSecureContext) {
+			showToast('Camera scanning requires HTTPS or localhost.', 'danger');
+			return;
+		}
+		if (!qrScannerSupported()) {
+			showToast('QR camera scanning is not available in this browser.', 'danger');
+			return;
+		}
+		state.qrScanner.active = true;
+		state.qrScanner.lastInvalid = '';
+		setQrScannerStatus('Point your camera at a Sugarchain receive QR.');
+		$('#qrScannerModal').classList.add('active');
+		navigator.mediaDevices.getUserMedia({
+			video: {
+				facingMode: {
+					ideal: 'environment'
+				}
+			},
+			audio: false
+		}).then(function (stream) {
+			if (!state.qrScanner.active) {
+				stream.getTracks().forEach(function (track) {
+					track.stop();
+				});
+				return;
+			}
+			state.qrScanner.stream = stream;
+			$('#qrScannerVideo').srcObject = stream;
+			return $('#qrScannerVideo').play();
+		}).then(function () {
+			if (state.qrScanner.active) {
+				scanQrFrame();
+			}
+		}).catch(function (error) {
+			stopQrScanner();
+			showToast(error && error.name === 'NotAllowedError' ? 'Camera access was blocked.' : 'Camera could not start.', 'danger');
+		});
+	}
+
+	function stopQrScanner() {
+		state.qrScanner.active = false;
+		state.qrScanner.detecting = false;
+		if (state.qrScanner.frame) {
+			window.cancelAnimationFrame(state.qrScanner.frame);
+			state.qrScanner.frame = 0;
+		}
+		if (state.qrScanner.stream) {
+			state.qrScanner.stream.getTracks().forEach(function (track) {
+				track.stop();
+			});
+			state.qrScanner.stream = null;
+		}
+		if ($('#qrScannerVideo')) {
+			$('#qrScannerVideo').pause();
+			$('#qrScannerVideo').srcObject = null;
+		}
+		if ($('#qrScannerModal')) {
+			$('#qrScannerModal').classList.remove('active');
+		}
 	}
 
 	function createKeys() {
@@ -1196,6 +1350,7 @@
 	}
 
 	function clearSensitiveMemory() {
+		stopQrScanner();
 		state.keys = null;
 		state.pendingTx = null;
 		state.pendingPlan = null;
@@ -2606,6 +2761,9 @@
 				$('#sendAmount').value = target.amount;
 			}
 		});
+
+		$('#scanQrButton').addEventListener('click', openQrScanner);
+		$('#closeQrScanner').addEventListener('click', stopQrScanner);
 
 		$('#sendMax').addEventListener('click', function () {
 			var fee = amountToSatoshis($('#sendFee').value || state.fee);

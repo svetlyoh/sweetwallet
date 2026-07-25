@@ -234,7 +234,12 @@
 									<div class="field-grid">
 										<div>
 											<label for="sendAddress">Recipient</label>
-											<input id="sendAddress" type="text" inputmode="text" placeholder="sugar1... or sugarchain: URI">
+											<div class="field-pair">
+												<input id="sendAddress" type="text" inputmode="text" placeholder="sugar1... or sugarchain: URI">
+												<button id="scanQrButton" class="copy-button" type="button" aria-label="Scan recipient QR code">
+													<i data-lucide="camera"></i>
+												</button>
+											</div>
 										</div>
 										<div>
 											<label for="sendAmount">Amount</label>
@@ -544,11 +549,27 @@
 			</div>
 		</div>
 
+		<div id="qrScannerModal" class="modal qr-scanner-modal" role="dialog" aria-modal="true" aria-label="Scan recipient QR code">
+			<div class="modal-card qr-scanner-card">
+				<h2>Scan Recipient QR</h2>
+				<div class="qr-video-frame">
+					<video id="qrScannerVideo" autoplay muted playsinline></video>
+					<div class="qr-scan-frame" aria-hidden="true"></div>
+				</div>
+				<canvas id="qrScannerCanvas" class="hidden"></canvas>
+				<div id="qrScannerStatus" class="notice">Point your camera at a Sugarchain receive QR.</div>
+				<div class="modal-actions single">
+					<button id="closeQrScanner" class="button secondary" type="button">Cancel</button>
+				</div>
+			</div>
+		</div>
+
 		<div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.qrcode/1.0/jquery.qrcode.min.js"></script>
 		<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 		<script src="lib/bitcoinjs-4.0.3-browser.js"></script>
 		<script src="wallet-vault.js"></script>
 		<script src="sweetwallet.js"></script>
