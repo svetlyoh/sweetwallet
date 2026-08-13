@@ -2612,12 +2612,12 @@
 		}
 		if (state.disconnectFlow.step === 'watch') {
 			closeDisconnectFlow();
-			closeWallet('Wallet disconnected.', 'danger');
+			deleteWalletFromDevice('Wallet disconnected from this device.', 'danger');
 			return;
 		}
 		if (state.disconnectFlow.step === 'backup') {
 			closeDisconnectFlow();
-			closeWallet('Wallet disconnected.', 'danger');
+			deleteWalletFromDevice('Wallet disconnected from this device.', 'danger');
 			return;
 		}
 		if (state.disconnectFlow.step === 'password') {
