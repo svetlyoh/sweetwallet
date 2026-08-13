@@ -543,16 +543,16 @@
 				<div class="menu-items">
 					<button class="menu-item" type="button" data-tab="activity"><i data-lucide="list"></i>Activity</button>
 					<button id="menuLockButton" class="menu-item" type="button"><i data-lucide="lock"></i>Lock</button>
-					<button id="menuSetupPinButton" class="menu-item menu-pin-setup" type="button">
-						<i data-lucide="shield-plus"></i>
-						<span>Set Up PIN</span>
-						<i class="menu-pin-sparkle" data-lucide="sparkles"></i>
-					</button>
 					<button class="menu-item" type="button" data-tab="keys"><i data-lucide="key-round"></i>Keys</button>
 					<button class="menu-item" type="button" data-tab="broadcast"><i data-lucide="radio"></i>Broadcast</button>
 					<button class="menu-item" type="button" data-tab="settings"><i data-lucide="settings"></i>Settings</button>
-					<button class="menu-item" type="button" data-tab="security"><i data-lucide="shield-check"></i>Security & Wallet Pin</button>
-					<button id="logoutButton" class="menu-item danger" type="button"><i data-lucide="log-out"></i>Logout</button>
+					<button id="menuSetupPinButton" class="menu-item menu-pin-setup" type="button">
+						<i data-lucide="shield-plus"></i>
+						<span>Manage PIN</span>
+						<i class="menu-pin-sparkle" data-lucide="sparkles"></i>
+					</button>
+					<button class="menu-item" type="button" data-tab="security"><i data-lucide="shield-check"></i>Security</button>
+					<button id="logoutButton" class="menu-item" type="button"><i data-lucide="unlink"></i>Disconnect Wallet</button>
 				</div>
 			</div>
 		</div>
@@ -626,6 +626,41 @@
 				<div class="modal-actions">
 					<button id="cancelPinSetup" class="button secondary" type="button">Cancel</button>
 					<button id="continuePinSetup" class="button" type="submit">Continue</button>
+				</div>
+			</form>
+		</div>
+
+		<div id="disconnectWalletModal" class="modal disconnect-wallet-modal" role="dialog" aria-modal="true" aria-label="Disconnect SweetWallet">
+			<form id="disconnectWalletForm" class="modal-card disconnect-wallet-card" autocomplete="off">
+				<div class="pin-setup-kicker" id="disconnectStepLabel">Secure disconnect</div>
+				<h2>Disconnect Wallet</h2>
+				<div id="disconnectPasswordStep" class="disconnect-step">
+					<div class="notice">Enter your wallet password before disconnecting.</div>
+					<div class="form-row">
+						<label for="disconnectPassword">Wallet password</label>
+						<input id="disconnectPassword" type="password" autocomplete="current-password" placeholder="Enter wallet password">
+					</div>
+				</div>
+				<div id="disconnectSaveStep" class="disconnect-step hidden">
+					<div class="notice warning">This wallet is only open for this session. Save it with a password before disconnecting.</div>
+					<div class="form-row">
+						<label for="disconnectSavePassword">New wallet password</label>
+						<input id="disconnectSavePassword" type="password" autocomplete="new-password" placeholder="At least 10 characters">
+					</div>
+					<div class="form-row">
+						<label for="disconnectSavePasswordConfirm">Confirm wallet password</label>
+						<input id="disconnectSavePasswordConfirm" type="password" autocomplete="new-password">
+					</div>
+				</div>
+				<div id="disconnectWatchStep" class="disconnect-step hidden">
+					<div class="notice">This is a watch-only wallet. Disconnecting closes it on this screen and does not affect the blockchain.</div>
+				</div>
+				<div id="disconnectBlockedStep" class="disconnect-step hidden">
+					<div id="disconnectBlockedMessage" class="notice danger">Wallet disconnect is not available right now.</div>
+				</div>
+				<div class="modal-actions">
+					<button id="cancelDisconnectWallet" class="button secondary" type="button">Cancel</button>
+					<button id="continueDisconnectWallet" class="button" type="submit">Disconnect</button>
 				</div>
 			</form>
 		</div>

@@ -80,6 +80,9 @@
 			step: 'password',
 			password: ''
 		},
+		disconnectFlow: {
+			step: 'password'
+		},
 		starterFundingRequested: {}
 	};
 
@@ -1497,7 +1500,7 @@
 		}
 	}
 
-	function closeWallet() {
+	function closeWallet(message) {
 		window.clearInterval(state.timer);
 		window.clearTimeout(state.autoLockTimer);
 		clearSensitiveMemory();
@@ -1514,7 +1517,7 @@
 		$('#sendSummary').classList.remove('active');
 		closeMenu();
 		updateWalletUi();
-		showToast('Wallet closed.');
+		showToast(message || 'Wallet closed.');
 	}
 
 	function openSavedWalletWithWif(record, wif) {
@@ -2377,6 +2380,129 @@
 		updatePinSetupCta();
 	}
 
+	function clearDisconnectFields() {
+		[
+			'#disconnectPassword',
+			'#disconnectSavePassword',
+			'#disconnectSavePasswordConfirm'
+		].forEach(function (selector) {
+			var input = $(selector);
+			if (input) {
+				input.value = '';
+			}
+		});
+	}
+
+	function setDisconnectStep(step, message) {
+		state.disconnectFlow.step = step || 'password';
+		var isPassword = state.disconnectFlow.step === 'password';
+		var isSave = state.disconnectFlow.step === 'save';
+		var isWatch = state.disconnectFlow.step === 'watch';
+		var isBlocked = state.disconnectFlow.step === 'blocked';
+		$('#disconnectStepLabel').textContent = isSave ? 'Save before disconnecting' :
+			isWatch ? 'Watch-only wallet' :
+				isBlocked ? 'Disconnect paused' : 'Secure disconnect';
+		$('#disconnectPasswordStep').classList.toggle('hidden', !isPassword);
+		$('#disconnectSaveStep').classList.toggle('hidden', !isSave);
+		$('#disconnectWatchStep').classList.toggle('hidden', !isWatch);
+		$('#disconnectBlockedStep').classList.toggle('hidden', !isBlocked);
+		if (isBlocked) {
+			$('#disconnectBlockedMessage').textContent = message || 'Wallet disconnect is not available right now.';
+		}
+		$('#continueDisconnectWallet').classList.toggle('hidden', isBlocked);
+		$('#continueDisconnectWallet').textContent = isSave ? 'Save & Disconnect' : 'Disconnect';
+		$('#cancelDisconnectWallet').textContent = isBlocked ? 'Close' : 'Cancel';
+		window.setTimeout(function () {
+			var target = isPassword ? $('#disconnectPassword') :
+				isSave ? $('#disconnectSavePassword') :
+					$('#continueDisconnectWallet');
+			if (target) {
+				target.focus();
+			}
+		}, 0);
+	}
+
+	function openDisconnectFlow() {
+		closeMenu();
+		clearDisconnectFields();
+		$('#disconnectWalletModal').classList.add('active');
+		if (!state.address) {
+			setDisconnectStep('blocked', 'No wallet is open.');
+			return;
+		}
+		if (state.savedVault) {
+			setDisconnectStep('password');
+			return;
+		}
+		if (state.keys) {
+			var cryptoError = vaultAvailabilityError();
+			if (cryptoError) {
+				setDisconnectStep('blocked', cryptoError + ' Export a backup before closing this session.');
+				showToast(cryptoError, 'danger');
+				return;
+			}
+			setDisconnectStep('save');
+			return;
+		}
+		setDisconnectStep('watch');
+	}
+
+	function closeDisconnectFlow() {
+		clearDisconnectFields();
+		$('#disconnectWalletModal').classList.remove('active');
+	}
+
+	function submitDisconnectFlow() {
+		var button = $('#continueDisconnectWallet');
+		var cancelButton = $('#cancelDisconnectWallet');
+		if (state.disconnectFlow.step === 'blocked') {
+			return;
+		}
+		if (state.disconnectFlow.step === 'watch') {
+			closeDisconnectFlow();
+			closeWallet('Wallet disconnected.');
+			return;
+		}
+		if (state.disconnectFlow.step === 'password') {
+			var password = $('#disconnectPassword').value;
+			if (!password) {
+				showToast('Enter your wallet password.', 'danger');
+				return;
+			}
+			cancelButton.disabled = true;
+			setBusy(button, true, 'Checking...');
+			Vault.decryptVault(state.savedVault, password).then(function () {
+				closeDisconnectFlow();
+				closeWallet('Wallet disconnected.');
+			}).catch(function (error) {
+				showToast(error.message || 'Wallet password was not accepted.', 'danger');
+			}).finally(function () {
+				cancelButton.disabled = false;
+				setBusy(button, false);
+			});
+			return;
+		}
+		if (state.disconnectFlow.step === 'save') {
+			var savePassword = $('#disconnectSavePassword').value;
+			var confirmPassword = $('#disconnectSavePasswordConfirm').value;
+			if (savePassword !== confirmPassword) {
+				showToast('Wallet passwords do not match.', 'danger');
+				return;
+			}
+			cancelButton.disabled = true;
+			setBusy(button, true, 'Saving...');
+			saveCurrentPrivateKey(savePassword).then(function () {
+				closeDisconnectFlow();
+				closeWallet('Wallet saved and disconnected.');
+			}).catch(function (error) {
+				showToast(error.message || 'Wallet could not be saved.', 'danger');
+			}).finally(function () {
+				cancelButton.disabled = false;
+				setBusy(button, false);
+			});
+		}
+	}
+
 	function submitPinSetup() {
 		var button = $('#continuePinSetup');
 		var cancelButton = $('#cancelPinSetup');
@@ -2700,6 +2826,13 @@
 		});
 
 		$('#cancelPinSetup').addEventListener('click', closePinSetupFlow);
+
+		$('#disconnectWalletForm').addEventListener('submit', function (event) {
+			event.preventDefault();
+			submitDisconnectFlow();
+		});
+
+		$('#cancelDisconnectWallet').addEventListener('click', closeDisconnectFlow);
 
 		$$('[data-pin-length]').forEach(function (button) {
 			button.addEventListener('click', function () {
@@ -3123,7 +3256,7 @@
 			}
 		});
 
-		$('#logoutButton').addEventListener('click', closeWallet);
+		$('#logoutButton').addEventListener('click', openDisconnectFlow);
 
 		['click', 'keydown', 'touchstart', 'input'].forEach(function (eventName) {
 			document.addEventListener(eventName, touchActivity, {

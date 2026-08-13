@@ -49,9 +49,16 @@ button {
 .shell {
 	width: min(100%, 480px);
 	min-height: 100vh;
+	min-height: 100svh;
 	margin: 0 auto;
 	padding: 14px 14px 32px;
 	position: relative;
+	display: flex;
+	flex-direction: column;
+}
+
+main {
+	flex: 1 0 auto;
 }
 
 .app-header {
@@ -192,11 +199,11 @@ button {
 }
 
 .about-footer {
-	margin-top: 18px;
-	padding: 16px;
+	margin-top: auto;
+	padding: 12px 14px;
 	border: 1px solid rgba(255, 255, 255, 0.16);
 	border-radius: 8px;
-	background: rgba(0, 35, 22, 0.42);
+	background: rgba(0, 35, 22, 0.26);
 	color: white;
 	text-align: center;
 }
@@ -208,37 +215,39 @@ button {
 }
 
 .about-footer p {
-	margin: 7px 0 14px;
-	color: rgba(255, 255, 255, 0.76);
-	font-size: 0.82rem;
+	margin: 6px 0 10px;
+	color: rgba(255, 255, 255, 0.64);
+	font-size: 0.76rem;
 	line-height: 1.4;
 }
 
 .about-project-button {
-	display: flex;
+	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	gap: 8px;
-	min-height: 48px;
-	padding: 10px 16px;
-	border: 1px solid rgba(123, 227, 143, 0.5);
+	gap: 6px;
+	min-height: 36px;
+	padding: 7px 10px;
+	border: 1px solid rgba(123, 227, 143, 0.22);
 	border-radius: 8px;
-	background: var(--sw-green-2);
-	color: white;
+	background: rgba(1, 63, 39, 0.42);
+	color: rgba(237, 255, 243, 0.82);
+	font-size: 0.74rem;
 	font-weight: 800;
 	text-decoration: none;
 }
 
 .about-project-button:hover,
 .about-project-button:focus-visible {
-	background: #20b865;
+	background: rgba(1, 63, 39, 0.68);
+	color: white;
 	outline: 2px solid rgba(123, 227, 143, 0.52);
 	outline-offset: 2px;
 }
 
 .about-project-button svg {
-	width: 19px;
-	height: 19px;
+	width: 15px;
+	height: 15px;
 }
 
 .login-card,
@@ -1490,15 +1499,10 @@ select:focus {
 
 .menu-item.menu-pin-setup {
 	justify-content: flex-start;
-	border: 1px solid rgba(144, 190, 255, 0.36);
-	background:
-		linear-gradient(135deg, #2f70e0, #194fb4);
-	color: white;
-	box-shadow: 0 10px 24px rgba(17, 64, 155, 0.26);
 }
 
 .menu-item.menu-pin-setup span {
-	color: white;
+	color: rgba(255, 255, 255, 0.96);
 	text-shadow: 0 0 12px rgba(255, 255, 255, 0.34);
 }
 
@@ -1649,14 +1653,30 @@ select:focus {
 	color: rgba(255, 255, 255, 0.88);
 }
 
-.pin-setup-card input {
+.pin-setup-card input,
+.disconnect-wallet-card input {
 	border-color: rgba(255, 255, 255, 0.18);
 	background: rgba(2, 62, 39, 0.78);
 	color: white;
 }
 
-.pin-setup-card input::placeholder {
+.pin-setup-card input::placeholder,
+.disconnect-wallet-card input::placeholder {
 	color: rgba(255, 255, 255, 0.58);
+}
+
+.disconnect-wallet-card {
+	display: grid;
+	gap: 12px;
+}
+
+.disconnect-step {
+	display: grid;
+	gap: 10px;
+}
+
+.disconnect-wallet-card label {
+	color: rgba(255, 255, 255, 0.88);
 }
 
 .qr-scanner-card {
