@@ -1118,6 +1118,15 @@ select:focus {
 	grid-template-columns: 1fr auto auto;
 }
 
+.panel-close-row {
+	display: grid;
+	margin-top: 14px;
+}
+
+.panel-close-button {
+	width: 100%;
+}
+
 .key-field {
 	margin-bottom: 12px;
 }

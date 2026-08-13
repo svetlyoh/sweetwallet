@@ -317,6 +317,12 @@
 										</button>
 									</div>
 								</div>
+								<div class="panel-close-row">
+									<button class="button subtle panel-close-button" type="button" data-tab="activity">
+										<i data-lucide="x"></i>
+										Close
+									</button>
+								</div>
 							</div>
 
 							<div class="panel" data-panel="broadcast">
@@ -332,6 +338,12 @@
 									</button>
 								</form>
 								<div id="broadcastResult" class="notice break-anywhere"></div>
+								<div class="panel-close-row">
+									<button class="button subtle panel-close-button" type="button" data-tab="activity">
+										<i data-lucide="x"></i>
+										Close
+									</button>
+								</div>
 							</div>
 
 							<div class="panel" data-panel="settings">
@@ -355,10 +367,21 @@
 									</select>
 								</div>
 								<div class="notice">Active backend: <span id="activeBackend"></span></div>
+								<div class="panel-close-row">
+									<button class="button subtle panel-close-button" type="button" data-tab="activity">
+										<i data-lucide="x"></i>
+										Close
+									</button>
+								</div>
 							</div>
 
 							<div class="panel" data-panel="security">
-								<h2>Security & Wallet Pin</h2>
+								<div class="panel-title-row">
+									<h2>Security</h2>
+									<button class="copy-button" type="button" data-tab="activity" aria-label="Close security">
+										<i data-lucide="x"></i>
+									</button>
+								</div>
 								<div id="securityStatus" class="notice">Security status loading...</div>
 								<div id="securityCapabilityNotice" class="notice warning">Saving the private key is optional. SweetWallet can keep this wallet session-only, or save it encrypted when this browser connection supports Web Crypto.</div>
 
@@ -518,6 +541,12 @@
 											<span>Require Confirmation for Every Transaction</span>
 										</label>
 									</section>
+								</div>
+								<div class="panel-close-row">
+									<button class="button subtle panel-close-button" type="button" data-tab="activity">
+										<i data-lucide="x"></i>
+										Close
+									</button>
 								</div>
 							</div>
 						</section>
