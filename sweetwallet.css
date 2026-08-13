@@ -400,6 +400,11 @@ button {
 	margin: 14px auto 8px;
 }
 
+.pin-entry[data-length="4"] {
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	width: min(100%, 204px);
+}
+
 .pin-input {
 	position: absolute;
 	width: 1px;
@@ -421,6 +426,10 @@ button {
 	box-shadow:
 		inset 0 0 0 1px rgba(255, 255, 255, 0.04),
 		0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.pin-box.pin-box-unused {
+	display: none;
 }
 
 .pin-box.filled::after {
@@ -1479,6 +1488,26 @@ select:focus {
 	color: #ffe8e6;
 }
 
+.menu-item.menu-pin-setup {
+	justify-content: flex-start;
+	border: 1px solid rgba(144, 190, 255, 0.36);
+	background:
+		linear-gradient(135deg, #2f70e0, #194fb4);
+	color: white;
+	box-shadow: 0 10px 24px rgba(17, 64, 155, 0.26);
+}
+
+.menu-item.menu-pin-setup span {
+	color: white;
+	text-shadow: 0 0 12px rgba(255, 255, 255, 0.34);
+}
+
+.menu-pin-sparkle {
+	margin-left: auto;
+	color: #ffe46a;
+	stroke-width: 2.4;
+}
+
 .menu-item[disabled] {
 	cursor: not-allowed;
 	opacity: 0.42;
@@ -1588,6 +1617,32 @@ select:focus {
 .pin-setup-step {
 	display: grid;
 	gap: 10px;
+}
+
+.pin-length-toggle {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 6px;
+	padding: 4px;
+	border-radius: 8px;
+	background: rgba(0, 21, 13, 0.34);
+	box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.pin-length-option {
+	min-height: 42px;
+	border: 0;
+	border-radius: 6px;
+	background: transparent;
+	color: rgba(255, 255, 255, 0.76);
+	font-size: 0.8rem;
+	font-weight: 800;
+}
+
+.pin-length-option.active {
+	background: #f7fff9;
+	color: #174a2d;
+	box-shadow: 0 4px 14px rgba(0, 18, 11, 0.24);
 }
 
 .pin-setup-card label {

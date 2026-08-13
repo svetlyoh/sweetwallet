@@ -76,6 +76,7 @@
 		},
 		pinSetup: {
 			isSetUp: false,
+			pinLength: 4,
 			step: 'password',
 			password: ''
 		},
@@ -188,14 +189,19 @@
 		return !!(record && record.quickUnlock && record.quickUnlock.enabled);
 	}
 
-	function normalizeSixDigitPin(value) {
-		return String(value || '').replace(/\D/g, '').slice(0, 6);
+	function normalizePin(value, maxLength) {
+		return String(value || '').replace(/\D/g, '').slice(0, maxLength || 6);
 	}
 
-	function validateSixDigitPin(value) {
-		if (!/^\d{6}$/.test(String(value || ''))) {
-			throw new Error('Use a 6-digit PIN.');
+	function validateFourOrSixDigitPin(value) {
+		if (!/^(\d{4}|\d{6})$/.test(String(value || ''))) {
+			throw new Error('Use a 4 or 6 digit PIN.');
 		}
+	}
+
+	function quickPinLength(record) {
+		var length = Number(record && record.quickUnlock && record.quickUnlock.pinLength);
+		return length === 4 ? 4 : 6;
 	}
 
 	function vaultAvailabilityError() {
@@ -1040,15 +1046,21 @@
 	}
 
 	function pinValue() {
-		return normalizeSixDigitPin($('#pinInput') && $('#pinInput').value);
+		return normalizePin($('#pinInput') && $('#pinInput').value, quickPinLength(state.savedVault));
 	}
 
 	function updatePinBoxes() {
 		var value = pinValue();
+		var length = quickPinLength(state.savedVault);
 		if ($('#pinInput')) {
 			$('#pinInput').value = value;
+			$('#pinInput').maxLength = length;
+		}
+		if ($('#pinEntry')) {
+			$('#pinEntry').dataset.length = String(length);
 		}
 		$$('#pinEntry .pin-box').forEach(function (box, index) {
+			box.classList.toggle('pin-box-unused', index >= length);
 			box.classList.toggle('filled', index < value.length);
 		});
 	}
@@ -1112,7 +1124,7 @@
 			return;
 		}
 		var value = pinValue();
-		if (value.length !== 6) {
+		if (value.length !== quickPinLength(state.savedVault)) {
 			return;
 		}
 		state.pinSubmitting = true;
@@ -1167,15 +1179,21 @@
 	}
 
 	function lockedPinValue() {
-		return normalizeSixDigitPin($('#lockedPinInput') && $('#lockedPinInput').value);
+		return normalizePin($('#lockedPinInput') && $('#lockedPinInput').value, quickPinLength(state.savedVault));
 	}
 
 	function updateLockedPinBoxes() {
 		var value = lockedPinValue();
+		var length = quickPinLength(state.savedVault);
 		if ($('#lockedPinInput')) {
 			$('#lockedPinInput').value = value;
+			$('#lockedPinInput').maxLength = length;
+		}
+		if ($('#lockedPinEntry')) {
+			$('#lockedPinEntry').dataset.length = String(length);
 		}
 		$$('#lockedPinEntry .pin-box').forEach(function (box, index) {
+			box.classList.toggle('pin-box-unused', index >= length);
 			box.classList.toggle('filled', index < value.length);
 		});
 	}
@@ -1246,7 +1264,7 @@
 			return;
 		}
 		var value = lockedPinValue();
-		if (value.length !== 6) {
+		if (value.length !== quickPinLength(state.savedVault)) {
 			return;
 		}
 		state.lockedPinSubmitting = true;
@@ -1610,9 +1628,9 @@
 		if (!state.savedVault) {
 			return Promise.reject(new Error('Save the private key before enabling quick-unlock PIN.'));
 		}
-		pin = normalizeSixDigitPin(pin);
+		pin = normalizePin(pin, 6);
 		try {
-			validateSixDigitPin(pin);
+			validateFourOrSixDigitPin(pin);
 		} catch (error) {
 			return Promise.reject(error);
 		}
@@ -1625,6 +1643,7 @@
 		}).then(function (quickUnlock) {
 			var record = JSON.parse(JSON.stringify(state.savedVault));
 			record.quickUnlock = quickUnlock;
+			record.quickUnlock.pinLength = pin.length;
 			record.updatedAt = new Date().toISOString();
 			saveVaultRecord(record);
 			updateWalletUi();
@@ -2096,7 +2115,7 @@
 				if (!hasQuickPin(state.savedVault)) {
 					throw new Error('Quick-unlock PIN is not enabled.');
 				}
-				return askSecret('Quick-Unlock PIN', 'Enter your quick-unlock PIN before sending.', '6+ digit PIN', 'numeric').then(function (pin) {
+				return askSecret('Quick-Unlock PIN', 'Enter your quick-unlock PIN before sending.', '4 or 6 digit PIN', 'numeric').then(function (pin) {
 					return getDeviceKey(false).then(function (deviceKey) {
 						return Vault.unwrapVaultKeyWithPin(state.savedVault, pin, deviceKey);
 					});
@@ -2276,6 +2295,21 @@
 		});
 	}
 
+	function setPinSetupLength(length) {
+		state.pinSetup.pinLength = Number(length) === 6 ? 6 : 4;
+		$$('[data-pin-length]').forEach(function (button) {
+			button.classList.toggle('active', Number(button.dataset.pinLength) === state.pinSetup.pinLength);
+		});
+		['#setupQuickPin', '#setupQuickPinConfirm'].forEach(function (selector) {
+			var input = $(selector);
+			if (input) {
+				input.maxLength = state.pinSetup.pinLength;
+				input.placeholder = state.pinSetup.pinLength + ' digits';
+				input.value = normalizePin(input.value, state.pinSetup.pinLength);
+			}
+		});
+	}
+
 	function setPinSetupStep(step, message) {
 		state.pinSetup.step = step === 'pin' || step === 'blocked' ? step : 'password';
 		var isPin = state.pinSetup.step === 'pin';
@@ -2291,6 +2325,9 @@
 		$('#continuePinSetup').classList.toggle('hidden', isBlocked);
 		$('#continuePinSetup').textContent = isPin ? 'Enable PIN' : 'Save Password';
 		$('#cancelPinSetup').textContent = isBlocked ? 'Close' : 'Cancel';
+		if (isPin) {
+			setPinSetupLength(state.pinSetup.pinLength);
+		}
 		window.setTimeout(function () {
 			if (isBlocked) {
 				$('#cancelPinSetup').focus();
@@ -2321,6 +2358,7 @@
 			return;
 		}
 		state.pinSetup.password = '';
+		setPinSetupLength(4);
 		clearPinSetupFields();
 		$('#pinSetupModal').classList.add('active');
 		var cryptoError = vaultAvailabilityError();
@@ -2376,12 +2414,17 @@
 		}
 
 		var passwordForPin = state.pinSetup.password || $('#setupPinPassword').value;
-		var pin = normalizeSixDigitPin($('#setupQuickPin').value);
-		var confirmPin = normalizeSixDigitPin($('#setupQuickPinConfirm').value);
+		var expectedLength = state.pinSetup.pinLength === 6 ? 6 : 4;
+		var pin = normalizePin($('#setupQuickPin').value, expectedLength);
+		var confirmPin = normalizePin($('#setupQuickPinConfirm').value, expectedLength);
 		$('#setupQuickPin').value = pin;
 		$('#setupQuickPinConfirm').value = confirmPin;
 		if (!passwordForPin) {
 			showToast('Enter your wallet password.', 'danger');
+			return;
+		}
+		if (pin.length !== expectedLength) {
+			showToast('Enter a ' + expectedLength + ' digit PIN.', 'danger');
 			return;
 		}
 		if (pin !== confirmPin) {
@@ -2389,7 +2432,7 @@
 			return;
 		}
 		try {
-			validateSixDigitPin(pin);
+			validateFourOrSixDigitPin(pin);
 		} catch (error) {
 			showToast(error.message, 'danger');
 			return;
@@ -2491,11 +2534,12 @@
 
 		$('#pinEntry').addEventListener('click', focusPinInput);
 		$('#pinEntry').addEventListener('keydown', function (event) {
+			var expectedLength = quickPinLength(state.savedVault);
 			if (/^\d$/.test(event.key)) {
 				event.preventDefault();
-				$('#pinInput').value = (pinValue() + event.key).slice(0, 6);
+				$('#pinInput').value = (pinValue() + event.key).slice(0, expectedLength);
 				updatePinBoxes();
-				if (pinValue().length === 6) {
+				if (pinValue().length === expectedLength) {
 					submitPinLogin();
 				}
 			} else if (event.key === 'Backspace') {
@@ -2505,8 +2549,9 @@
 			}
 		});
 		$('#pinInput').addEventListener('input', function () {
+			var expectedLength = quickPinLength(state.savedVault);
 			updatePinBoxes();
-			if (pinValue().length === 6) {
+			if (pinValue().length === expectedLength) {
 				submitPinLogin();
 			}
 		});
@@ -2548,11 +2593,12 @@
 
 		$('#lockedPinEntry').addEventListener('click', focusLockedPinInput);
 		$('#lockedPinEntry').addEventListener('keydown', function (event) {
+			var expectedLength = quickPinLength(state.savedVault);
 			if (/^\d$/.test(event.key)) {
 				event.preventDefault();
-				$('#lockedPinInput').value = (lockedPinValue() + event.key).slice(0, 6);
+				$('#lockedPinInput').value = (lockedPinValue() + event.key).slice(0, expectedLength);
 				updateLockedPinBoxes();
-				if (lockedPinValue().length === 6) {
+				if (lockedPinValue().length === expectedLength) {
 					submitLockedPin();
 				}
 			} else if (event.key === 'Backspace') {
@@ -2562,8 +2608,9 @@
 			}
 		});
 		$('#lockedPinInput').addEventListener('input', function () {
+			var expectedLength = quickPinLength(state.savedVault);
 			updateLockedPinBoxes();
-			if (lockedPinValue().length === 6) {
+			if (lockedPinValue().length === expectedLength) {
 				submitLockedPin();
 			}
 		});
@@ -2590,6 +2637,11 @@
 				return;
 			}
 			lockWallet('Wallet locked.');
+		});
+
+		$('#menuSetupPinButton').addEventListener('click', function () {
+			closeMenu();
+			openPinSetupFlow();
 		});
 
 		$$('[data-tab]').forEach(function (button) {
@@ -2649,11 +2701,18 @@
 
 		$('#cancelPinSetup').addEventListener('click', closePinSetupFlow);
 
+		$$('[data-pin-length]').forEach(function (button) {
+			button.addEventListener('click', function () {
+				setPinSetupLength(button.dataset.pinLength);
+			});
+		});
+
 		['#setupQuickPin', '#setupQuickPinConfirm', '#quickPin'].forEach(function (selector) {
 			var input = $(selector);
 			if (input) {
 				input.addEventListener('input', function () {
-					input.value = normalizeSixDigitPin(input.value);
+					var maxLength = Number(input.maxLength || 6);
+					input.value = normalizePin(input.value, maxLength);
 				});
 			}
 		});

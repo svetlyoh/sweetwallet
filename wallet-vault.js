@@ -162,10 +162,10 @@
 
 	function validatePin(pin) {
 		var value = String(pin || '');
-		if (!/^\d{6,}$/.test(value)) {
+		if (!/^(\d{4}|\d{6})$/.test(value)) {
 			return {
 				ok: false,
-				message: 'Use a numeric PIN with at least 6 digits.'
+				message: 'Use a numeric PIN with 4 or 6 digits.'
 			};
 		}
 		return {

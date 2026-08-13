@@ -63,6 +63,14 @@ test('does not serialize plaintext private key and can rewrap password', async (
 	await assert.rejects(() => Vault.decryptVault(updated, PASSWORD), /unlock/);
 });
 
+test('accepts only 4 or 6 digit quick-unlock PINs', () => {
+	assert.equal(Vault.validatePin('1234').ok, true);
+	assert.equal(Vault.validatePin('123456').ok, true);
+	assert.equal(Vault.validatePin('12345').ok, false);
+	assert.equal(Vault.validatePin('1234567').ok, false);
+	assert.equal(Vault.validatePin('abcd').ok, false);
+});
+
 test('rejects cleanly when browser crypto is not in a secure context', async () => {
 	const hadSecureContext = Object.prototype.hasOwnProperty.call(globalThis, 'isSecureContext');
 	const originalSecureContext = globalThis.isSecureContext;

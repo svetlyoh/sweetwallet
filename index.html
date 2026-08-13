@@ -69,7 +69,7 @@
 							<div class="login-field-row">
 								<div id="pinEntryWrap" class="form-row">
 									<label id="loginSecretLabel" for="loginSecret">Quick-unlock PIN</label>
-									<div id="pinEntry" class="pin-entry" role="button" tabindex="0" aria-label="Enter six digit PIN">
+									<div id="pinEntry" class="pin-entry" role="button" tabindex="0" aria-label="Enter PIN">
 										<span class="pin-box"></span>
 										<span class="pin-box"></span>
 										<span class="pin-box"></span>
@@ -179,7 +179,7 @@
 										<div class="login-field-row">
 											<div id="lockedPinEntryWrap" class="form-row">
 												<label for="lockedPinInput">Quick-unlock PIN</label>
-												<div id="lockedPinEntry" class="pin-entry" role="button" tabindex="0" aria-label="Enter six digit PIN">
+												<div id="lockedPinEntry" class="pin-entry" role="button" tabindex="0" aria-label="Enter PIN">
 													<span class="pin-box"></span>
 													<span class="pin-box"></span>
 													<span class="pin-box"></span>
@@ -432,7 +432,7 @@
 											</div>
 											<div class="form-row">
 												<label for="quickPin">Quick-unlock PIN</label>
-												<input id="quickPin" type="password" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="6 digits">
+												<input id="quickPin" type="password" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="4 or 6 digits">
 											</div>
 											<button id="setPinButton" class="button subtle" type="submit">
 												<i data-lucide="hash"></i>
@@ -543,6 +543,11 @@
 				<div class="menu-items">
 					<button class="menu-item" type="button" data-tab="activity"><i data-lucide="list"></i>Activity</button>
 					<button id="menuLockButton" class="menu-item" type="button"><i data-lucide="lock"></i>Lock</button>
+					<button id="menuSetupPinButton" class="menu-item menu-pin-setup" type="button">
+						<i data-lucide="shield-plus"></i>
+						<span>Set Up PIN</span>
+						<i class="menu-pin-sparkle" data-lucide="sparkles"></i>
+					</button>
 					<button class="menu-item" type="button" data-tab="keys"><i data-lucide="key-round"></i>Keys</button>
 					<button class="menu-item" type="button" data-tab="broadcast"><i data-lucide="radio"></i>Broadcast</button>
 					<button class="menu-item" type="button" data-tab="settings"><i data-lucide="settings"></i>Settings</button>
@@ -594,18 +599,25 @@
 					</div>
 				</div>
 				<div id="pinSetupPinStep" class="pin-setup-step hidden">
-					<div class="notice">Now pick a 6-digit PIN for quick unlock on this browser.</div>
+					<div class="notice">Now pick a 4 or 6 digit PIN for quick unlock on this browser.</div>
 					<div id="setupPinPasswordWrap" class="form-row hidden">
 						<label for="setupPinPassword">Wallet password</label>
 						<input id="setupPinPassword" type="password" autocomplete="current-password" placeholder="Enter wallet password">
 					</div>
 					<div class="form-row">
+						<label>PIN length</label>
+						<div class="pin-length-toggle" role="group" aria-label="PIN length">
+							<button class="pin-length-option active" type="button" data-pin-length="4">4 digit</button>
+							<button class="pin-length-option" type="button" data-pin-length="6">6 digit</button>
+						</div>
+					</div>
+					<div class="form-row">
 						<label for="setupQuickPin">Quick-unlock PIN</label>
-						<input id="setupQuickPin" type="password" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="6 digits">
+						<input id="setupQuickPin" type="password" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="4 digits">
 					</div>
 					<div class="form-row">
 						<label for="setupQuickPinConfirm">Confirm PIN</label>
-						<input id="setupQuickPinConfirm" type="password" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="6 digits">
+						<input id="setupQuickPinConfirm" type="password" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="4 digits">
 					</div>
 				</div>
 				<div id="pinSetupBlockedStep" class="pin-setup-step hidden">
