@@ -981,8 +981,8 @@
 		var isWatch = state.mode === 'watch';
 		var isLocked = state.mode === 'locked';
 		$$('[data-tab="send"]').forEach(function (button) {
-			button.disabled = !canSign;
-			button.title = canSign ? '' : (isWatch ? 'Watch-only wallets cannot send.' : 'Unlock the wallet before sending.');
+			button.disabled = isLocked;
+			button.title = isLocked ? 'Unlock the wallet before sending.' : (!canSign && isWatch ? 'Open this wallet with its private key before sending.' : '');
 		});
 		if ($('#savedWalletInfo')) {
 			$('#savedWalletInfo').classList.toggle('hidden', !state.savedVault);
@@ -1006,9 +1006,8 @@
 			return;
 		}
 		state.pinSetup.isSetUp = !!(state.savedVault && hasQuickPin(state.savedVault));
-		var needsPinSetup = !!state.keys &&
+		var needsPinSetup = !!state.address &&
 			state.mode !== 'locked' &&
-			state.mode !== 'watch' &&
 			!state.pinSetup.isSetUp;
 		button.classList.toggle('hidden', !needsPinSetup);
 		balanceRow.classList.toggle('pin-needed', needsPinSetup);
@@ -2227,9 +2226,9 @@
 	}
 
 	function switchTab(name) {
-		if (name === 'send' && !state.keys) {
-			showToast(state.mode === 'watch' ? 'Watch-only wallets cannot send.' : 'Unlock the wallet before sending.', 'danger');
-			name = state.mode === 'locked' ? 'locked' : 'activity';
+		if (name === 'send' && state.mode === 'locked') {
+			showToast('Unlock the wallet before sending.', 'danger');
+			name = 'locked';
 		}
 		$$('.panel').forEach(function (panel) {
 			panel.classList.toggle('active', panel.dataset.panel === name);
@@ -2308,10 +2307,13 @@
 
 	function openPinSetupFlow() {
 		if (!state.keys) {
+			var message = state.mode === 'watch' ?
+				'This device only has a watch-only address. Open this wallet with its private key first, then SweetWallet can save it and set up a PIN.' :
+				'Unlock this wallet first, then set up a PIN from the balance screen.';
 			clearPinSetupFields();
 			$('#pinSetupModal').classList.add('active');
-			setPinSetupStep('blocked', 'Unlock this wallet first, then set up a PIN from the balance screen.');
-			showToast('Unlock this wallet before setting up a PIN.', 'danger');
+			setPinSetupStep('blocked', message);
+			showToast(state.mode === 'watch' ? 'Open with the private key before setting up a PIN.' : 'Unlock this wallet before setting up a PIN.', 'danger');
 			return;
 		}
 		if (state.savedVault && hasQuickPin(state.savedVault)) {
