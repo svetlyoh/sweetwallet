@@ -59,6 +59,7 @@
 		pendingTx: null,
 		pendingPlan: null,
 		broadcasting: false,
+		keyPrivateRevealed: false,
 		showFullBalance: false,
 		activity: {
 			loaded: false,
@@ -172,6 +173,7 @@
 
 	function saveVaultRecord(record) {
 		state.savedVault = record;
+		state.keyPrivateRevealed = false;
 		storageJsonSet(STORAGE.vault, record);
 		savePublicWallet({
 			walletId: record.walletId,
@@ -192,6 +194,10 @@
 
 	function hasQuickPin(record) {
 		return !!(record && record.quickUnlock && record.quickUnlock.enabled);
+	}
+
+	function isActiveWalletSaved() {
+		return !!(state.savedVault && state.address && state.savedVault.address === state.address);
 	}
 
 	function normalizePin(value, maxLength) {
@@ -768,8 +774,30 @@
 		}
 		$('#keyAddress').value = state.address;
 		$('#keyPublic').value = pubkey;
-		$('#keyPrivate').value = state.keys ? state.keys.toWIF() : '';
+		renderPrivateKeyField();
 		$('#keyRedeem').value = redeem;
+	}
+
+	function renderPrivateKeyField() {
+		var input = $('#keyPrivate');
+		var revealButton = $('#toggleKeyPrivate');
+		var copyButton = $('#copyKeyPrivate');
+		if (!input || !revealButton || !copyButton) {
+			return;
+		}
+		var protectedByPassword = isActiveWalletSaved();
+		var wif = state.keys ? state.keys.toWIF() : '';
+		var hidden = protectedByPassword && !state.keyPrivateRevealed;
+		input.value = hidden ? '*****' : wif;
+		revealButton.classList.toggle('hidden', !protectedByPassword);
+		copyButton.classList.toggle('hidden', hidden || !wif);
+		revealButton.disabled = protectedByPassword && !state.keys;
+		copyButton.disabled = !wif || hidden;
+		revealButton.setAttribute('aria-label', hidden ? 'Reveal private key' : 'Hide private key');
+		revealButton.innerHTML = hidden ? '<i data-lucide="eye"></i>' : '<i data-lucide="eye-off"></i>';
+		if (window.lucide) {
+			window.lucide.createIcons();
+		}
 	}
 
 	function updateBackendUi() {
@@ -1406,6 +1434,7 @@
 	function clearSensitiveMemory() {
 		stopQrScanner();
 		state.keys = null;
+		state.keyPrivateRevealed = false;
 		state.pendingTx = null;
 		state.pendingPlan = null;
 		state.lastTxHex = '';
@@ -1436,6 +1465,7 @@
 		state.publicKeyHex = keys.publicKey.toString('hex');
 		state.walletId = walletId || state.walletId || (state.savedVault && state.savedVault.walletId) || '';
 		state.mode = mode || 'session';
+		state.keyPrivateRevealed = false;
 		state.balance = 0;
 		state.pendingTx = null;
 		state.pendingPlan = null;
@@ -2886,6 +2916,39 @@
 		showToast('Copied.');
 	}
 
+	function revealPrivateKeyWithPassword() {
+		if (!isActiveWalletSaved()) {
+			state.keyPrivateRevealed = true;
+			renderPrivateKeyField();
+			return;
+		}
+		requireSavedWalletPassword('Type Password to reveal private key.').then(function (result) {
+			var activeWif = state.keys ? state.keys.toWIF() : '';
+			if (result.wif !== activeWif) {
+				throw new Error('Saved wallet does not match this open wallet.');
+			}
+			state.keyPrivateRevealed = true;
+			renderPrivateKeyField();
+			showToast('Private key revealed.');
+		}).catch(function (error) {
+			var errorMessage = (error && error.message) || '';
+			var message = /unlock|accepted|password/i.test(errorMessage) ?
+				'Incorrect password.' :
+				(errorMessage || 'Private key could not be revealed.');
+			showToast(message, 'danger');
+		});
+	}
+
+	function togglePrivateKeyVisibility() {
+		if (state.keyPrivateRevealed) {
+			state.keyPrivateRevealed = false;
+			renderPrivateKeyField();
+			showToast('Private key hidden.');
+			return;
+		}
+		revealPrivateKeyWithPassword();
+	}
+
 	function wireEvents() {
 		$$('[data-login-mode]').forEach(function (button) {
 			button.addEventListener('click', function () {
@@ -3049,6 +3112,16 @@
 
 		$('#copyReceive').addEventListener('click', function () {
 			copyValue(state.address);
+		});
+
+		$('#toggleKeyPrivate').addEventListener('click', togglePrivateKeyVisibility);
+
+		$('#copyKeyPrivate').addEventListener('click', function () {
+			if (isActiveWalletSaved() && !state.keyPrivateRevealed) {
+				showToast('Reveal the private key first.', 'danger');
+				return;
+			}
+			copyValue(state.keys ? state.keys.toWIF() : '');
 		});
 
 		document.addEventListener('click', function (event) {

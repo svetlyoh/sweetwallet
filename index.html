@@ -298,9 +298,12 @@
 								</div>
 								<div class="key-field">
 									<label for="keyPrivate">Private key backup</label>
-									<div class="field-pair">
+									<div class="field-pair key-private-pair">
 										<input id="keyPrivate" class="monospace" readonly>
-										<button class="copy-button" type="button" data-copy-target="#keyPrivate" aria-label="Copy private key">
+										<button id="toggleKeyPrivate" class="copy-button" type="button" aria-label="Reveal private key">
+											<i data-lucide="eye"></i>
+										</button>
+										<button id="copyKeyPrivate" class="copy-button" type="button" aria-label="Copy private key">
 											<i data-lucide="copy"></i>
 										</button>
 									</div>

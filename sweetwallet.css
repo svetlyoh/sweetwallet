@@ -1114,6 +1114,10 @@ select:focus {
 	align-items: end;
 }
 
+.field-pair.key-private-pair {
+	grid-template-columns: 1fr auto auto;
+}
+
 .key-field {
 	margin-bottom: 12px;
 }
