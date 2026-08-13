@@ -75,6 +75,7 @@
 			lastInvalid: ''
 		},
 		pinSetup: {
+			isSetUp: false,
 			step: 'password',
 			password: ''
 		},
@@ -1000,16 +1001,17 @@
 
 	function updatePinSetupCta() {
 		var button = $('#setupPinPromptButton');
-		var status = $('#walletStatusPill');
-		if (!button || !status) {
+		var balanceRow = $('.wallet-balance-row');
+		if (!button || !balanceRow) {
 			return;
 		}
+		state.pinSetup.isSetUp = !!(state.savedVault && hasQuickPin(state.savedVault));
 		var needsPinSetup = !!state.keys &&
 			state.mode !== 'locked' &&
 			state.mode !== 'watch' &&
-			(!state.savedVault || !hasQuickPin(state.savedVault));
+			!state.pinSetup.isSetUp;
 		button.classList.toggle('hidden', !needsPinSetup);
-		status.classList.toggle('hidden', needsPinSetup);
+		balanceRow.classList.toggle('pin-needed', needsPinSetup);
 	}
 
 	function updateMenuUi() {
@@ -2275,15 +2277,26 @@
 		});
 	}
 
-	function setPinSetupStep(step) {
-		state.pinSetup.step = step === 'pin' ? 'pin' : 'password';
+	function setPinSetupStep(step, message) {
+		state.pinSetup.step = step === 'pin' || step === 'blocked' ? step : 'password';
 		var isPin = state.pinSetup.step === 'pin';
-		$('#pinSetupStepLabel').textContent = isPin ? 'Step 2 of 2' : 'Step 1 of 2';
-		$('#pinSetupPasswordStep').classList.toggle('hidden', isPin);
-		$('#pinSetupPinStep').classList.toggle('hidden', !isPin);
+		var isBlocked = state.pinSetup.step === 'blocked';
+		$('#pinSetupStepLabel').textContent = isBlocked ? 'Setup paused' : (isPin ? 'Step 2 of 2' : 'Step 1 of 2');
+		$('#pinSetupPasswordStep').classList.toggle('hidden', isPin || isBlocked);
+		$('#pinSetupPinStep').classList.toggle('hidden', !isPin || isBlocked);
+		$('#pinSetupBlockedStep').classList.toggle('hidden', !isBlocked);
 		$('#setupPinPasswordWrap').classList.toggle('hidden', !isPin || !!state.pinSetup.password);
+		if (isBlocked) {
+			$('#pinSetupBlockedMessage').textContent = message || 'PIN setup is not available right now.';
+		}
+		$('#continuePinSetup').classList.toggle('hidden', isBlocked);
 		$('#continuePinSetup').textContent = isPin ? 'Enable PIN' : 'Save Password';
+		$('#cancelPinSetup').textContent = isBlocked ? 'Close' : 'Cancel';
 		window.setTimeout(function () {
+			if (isBlocked) {
+				$('#cancelPinSetup').focus();
+				return;
+			}
 			var target = isPin ?
 				(state.pinSetup.password ? $('#setupQuickPin') : $('#setupPinPassword')) :
 				$('#setupWalletPassword');
@@ -2295,21 +2308,25 @@
 
 	function openPinSetupFlow() {
 		if (!state.keys) {
-			showToast('Open a wallet before setting up a PIN.', 'danger');
+			clearPinSetupFields();
+			$('#pinSetupModal').classList.add('active');
+			setPinSetupStep('blocked', 'Unlock this wallet first, then set up a PIN from the balance screen.');
+			showToast('Unlock this wallet before setting up a PIN.', 'danger');
 			return;
 		}
 		if (state.savedVault && hasQuickPin(state.savedVault)) {
 			showToast('Quick-unlock PIN is already set up.');
 			return;
 		}
-		var cryptoError = vaultAvailabilityError();
-		if (cryptoError) {
-			showToast(cryptoError, 'danger');
-			return;
-		}
 		state.pinSetup.password = '';
 		clearPinSetupFields();
 		$('#pinSetupModal').classList.add('active');
+		var cryptoError = vaultAvailabilityError();
+		if (cryptoError) {
+			setPinSetupStep('blocked', cryptoError);
+			showToast(cryptoError, 'danger');
+			return;
+		}
 		setPinSetupStep(state.savedVault ? 'pin' : 'password');
 	}
 
@@ -2323,6 +2340,9 @@
 	function submitPinSetup() {
 		var button = $('#continuePinSetup');
 		var cancelButton = $('#cancelPinSetup');
+		if (state.pinSetup.step === 'blocked') {
+			return;
+		}
 		if (state.pinSetup.step === 'password') {
 			var password = $('#setupWalletPassword').value;
 			var confirmPassword = $('#setupWalletPasswordConfirm').value;
@@ -2611,7 +2631,14 @@
 			copyValue(state.address);
 		});
 
-		$('#setupPinPromptButton').addEventListener('click', openPinSetupFlow);
+		document.addEventListener('click', function (event) {
+			var setupButton = event.target.closest('#setupPinPromptButton');
+			if (!setupButton) {
+				return;
+			}
+			event.preventDefault();
+			openPinSetupFlow();
+		});
 
 		$('#pinSetupForm').addEventListener('submit', function (event) {
 			event.preventDefault();

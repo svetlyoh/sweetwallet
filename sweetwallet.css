@@ -191,6 +191,56 @@ button {
 	display: block;
 }
 
+.about-footer {
+	margin-top: 18px;
+	padding: 16px;
+	border: 1px solid rgba(255, 255, 255, 0.16);
+	border-radius: 8px;
+	background: rgba(0, 35, 22, 0.42);
+	color: white;
+	text-align: center;
+}
+
+.about-footer h2 {
+	margin: 0;
+	font-size: 1rem;
+	font-weight: 800;
+}
+
+.about-footer p {
+	margin: 7px 0 14px;
+	color: rgba(255, 255, 255, 0.76);
+	font-size: 0.82rem;
+	line-height: 1.4;
+}
+
+.about-project-button {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	min-height: 48px;
+	padding: 10px 16px;
+	border: 1px solid rgba(123, 227, 143, 0.5);
+	border-radius: 8px;
+	background: var(--sw-green-2);
+	color: white;
+	font-weight: 800;
+	text-decoration: none;
+}
+
+.about-project-button:hover,
+.about-project-button:focus-visible {
+	background: #20b865;
+	outline: 2px solid rgba(123, 227, 143, 0.52);
+	outline-offset: 2px;
+}
+
+.about-project-button svg {
+	width: 19px;
+	height: 19px;
+}
+
 .login-card,
 .wallet-card,
 .panel {
@@ -643,6 +693,23 @@ select:focus {
 	min-width: 0;
 }
 
+.wallet-balance-row.pin-needed {
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: center;
+}
+
+.wallet-balance-row.pin-needed .setup-pin-button {
+	grid-column: 2;
+	grid-row: 1;
+}
+
+.wallet-balance-row.pin-needed .balance-expand {
+	grid-column: 2;
+	grid-row: 2;
+	justify-self: end;
+	margin-top: 6px;
+}
+
 .wallet-balance {
 	margin: 0;
 	font-size: clamp(2.65rem, 9.35vw, 3.4rem);
@@ -693,30 +760,38 @@ select:focus {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	gap: 8px;
-	width: 100%;
-	min-height: 48px;
-	margin-top: 12px;
+	gap: 5px;
+	width: auto;
+	min-height: 36px;
+	padding: 7px 9px;
 	border: 0;
 	border-radius: 8px;
-	background: #0c8d4b;
+	background: #2867d6;
 	color: white;
-	font-size: 0.86rem;
+	font-size: 0.7rem;
 	font-weight: 800;
 	text-transform: uppercase;
+	white-space: nowrap;
+	box-shadow: 0 8px 18px rgba(17, 64, 155, 0.28);
 }
 
 .setup-pin-button:hover,
 .setup-pin-button:focus-visible {
-	background: #0a7a43;
+	background: #1d55bb;
 	color: white;
-	outline: 2px solid rgba(123, 227, 143, 0.45);
+	outline: 2px solid rgba(124, 178, 255, 0.48);
 	outline-offset: 2px;
 }
 
 .setup-pin-button svg {
-	width: 20px;
-	height: 20px;
+	width: 15px;
+	height: 15px;
+	flex: 0 0 auto;
+}
+
+.setup-pin-button .setup-pin-sparkle {
+	color: #ffe46a;
+	stroke-width: 2.4;
 }
 
 .address-box {
@@ -753,6 +828,12 @@ select:focus {
 	border-radius: 8px;
 	background: #f5fcf7;
 	color: #0c5d34;
+}
+
+.max-button {
+	font-size: 0.78rem;
+	font-weight: 800;
+	text-transform: uppercase;
 }
 
 .qr-wrap {
@@ -1447,6 +1528,12 @@ select:focus {
 	border-color: rgba(132, 217, 150, 0.2);
 	background: rgba(1, 63, 39, 0.5);
 	color: rgba(237, 255, 243, 0.9);
+}
+
+.modal-card .notice.danger {
+	border-color: rgba(255, 151, 139, 0.34);
+	background: rgba(92, 28, 24, 0.46);
+	color: #ffe8e6;
 }
 
 .modal-actions {
