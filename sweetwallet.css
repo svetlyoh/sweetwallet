@@ -199,11 +199,11 @@ main {
 }
 
 .about-footer {
-	margin-top: auto;
-	padding: 12px 14px;
+	margin-top: clamp(220px, 34svh, 340px);
+	padding: 9px 12px;
 	border: 1px solid rgba(255, 255, 255, 0.16);
 	border-radius: 8px;
-	background: rgba(0, 35, 22, 0.26);
+	background: rgba(0, 35, 22, 0.2);
 	color: white;
 	text-align: center;
 }
@@ -215,10 +215,10 @@ main {
 }
 
 .about-footer p {
-	margin: 6px 0 10px;
-	color: rgba(255, 255, 255, 0.64);
-	font-size: 0.76rem;
-	line-height: 1.4;
+	margin: 4px 0 8px;
+	color: rgba(255, 255, 255, 0.56);
+	font-size: 0.62rem;
+	line-height: 1.25;
 }
 
 .about-project-button {
@@ -640,6 +640,18 @@ select:focus {
 	color: white;
 	box-shadow: 0 12px 36px rgba(0, 0, 0, 0.28);
 	font-weight: 700;
+}
+
+.toast.danger {
+	border: 1px solid rgba(255, 151, 139, 0.32);
+	background: #7d2a25;
+	color: #fff3f1;
+}
+
+.toast.warning {
+	border: 1px solid rgba(255, 225, 132, 0.34);
+	background: #60480c;
+	color: #fff8dc;
 }
 
 .toast:empty {
@@ -1601,6 +1613,23 @@ select:focus {
 	background: rgba(1, 63, 39, 0.76);
 }
 
+.modal-card .button.subtle {
+	border: 1px solid rgba(132, 217, 150, 0.2);
+	background: rgba(1, 63, 39, 0.56);
+	color: rgba(237, 255, 243, 0.94);
+}
+
+.modal-card .button.danger {
+	border: 1px solid rgba(255, 151, 139, 0.3);
+	background: #8b302a;
+	color: #fff3f1;
+}
+
+.modal-card .button.danger:hover,
+.modal-card .button.danger:focus-visible {
+	background: #a73b34;
+}
+
 .pin-setup-card {
 	display: grid;
 	gap: 12px;
@@ -1621,6 +1650,27 @@ select:focus {
 .pin-setup-step {
 	display: grid;
 	gap: 10px;
+}
+
+.pin-manage-actions {
+	display: grid;
+	gap: 8px;
+}
+
+.pin-manage-actions .button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+}
+
+.pin-manage-actions svg {
+	width: 18px;
+	height: 18px;
+}
+
+.pin-setup-card .modal-actions.manage-only {
+	grid-template-columns: 1fr;
 }
 
 .pin-length-toggle {

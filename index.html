@@ -586,7 +586,20 @@
 		<div id="pinSetupModal" class="modal pin-setup-modal" role="dialog" aria-modal="true" aria-label="Set up SweetWallet PIN">
 			<form id="pinSetupForm" class="modal-card pin-setup-card" autocomplete="off">
 				<div class="pin-setup-kicker" id="pinSetupStepLabel">Step 1 of 2</div>
-				<h2>Set up PIN</h2>
+				<h2 id="pinSetupTitle">Set up PIN</h2>
+				<div id="pinSetupManageStep" class="pin-setup-step hidden">
+					<div class="notice">Choose what you want to do with quick-unlock on this browser.</div>
+					<div class="pin-manage-actions">
+						<button id="changePinOptionButton" class="button subtle" type="button">
+							<i data-lucide="shield-check"></i>
+							<span>Change PIN</span>
+						</button>
+						<button id="deletePinOptionButton" class="button danger" type="button">
+							<i data-lucide="shield-x"></i>
+							<span>Delete PIN</span>
+						</button>
+					</div>
+				</div>
 				<div id="pinSetupPasswordStep" class="pin-setup-step">
 					<div class="notice">First, make a wallet password. This saves your wallet safely on this device.</div>
 					<div class="form-row">
@@ -620,6 +633,35 @@
 						<input id="setupQuickPinConfirm" type="password" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="4 digits">
 					</div>
 				</div>
+				<div id="pinSetupChangeStep" class="pin-setup-step hidden">
+					<div class="notice">Enter your current PIN, then choose a new 4 or 6 digit PIN.</div>
+					<div class="form-row">
+						<label for="changeOldPin">Current PIN</label>
+						<input id="changeOldPin" type="password" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="Current PIN">
+					</div>
+					<div class="form-row">
+						<label>New PIN length</label>
+						<div class="pin-length-toggle" role="group" aria-label="New PIN length">
+							<button class="pin-length-option active" type="button" data-pin-length="4">4 digit</button>
+							<button class="pin-length-option" type="button" data-pin-length="6">6 digit</button>
+						</div>
+					</div>
+					<div class="form-row">
+						<label for="changeNewPin">New PIN</label>
+						<input id="changeNewPin" type="password" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="4 digits">
+					</div>
+					<div class="form-row">
+						<label for="changeNewPinConfirm">Confirm new PIN</label>
+						<input id="changeNewPinConfirm" type="password" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="4 digits">
+					</div>
+				</div>
+				<div id="pinSetupDeleteStep" class="pin-setup-step hidden">
+					<div class="notice danger">Delete quick-unlock PIN from this browser. Your wallet password will still open the saved wallet.</div>
+					<div class="form-row">
+						<label for="deletePinCurrent">Current PIN</label>
+						<input id="deletePinCurrent" type="password" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="Current PIN">
+					</div>
+				</div>
 				<div id="pinSetupBlockedStep" class="pin-setup-step hidden">
 					<div id="pinSetupBlockedMessage" class="notice danger">PIN setup is not available right now.</div>
 				</div>
@@ -640,6 +682,7 @@
 						<label for="disconnectPassword">Wallet password</label>
 						<input id="disconnectPassword" type="password" autocomplete="current-password" placeholder="Enter wallet password">
 					</div>
+					<div id="disconnectFeedback" class="notice danger hidden">Incorrect password.</div>
 				</div>
 				<div id="disconnectSaveStep" class="disconnect-step hidden">
 					<div class="notice warning">This wallet is only open for this session. Save it with a password before disconnecting.</div>

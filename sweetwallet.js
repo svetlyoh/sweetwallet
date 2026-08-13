@@ -78,7 +78,8 @@
 			isSetUp: false,
 			pinLength: 4,
 			step: 'password',
-			password: ''
+			password: '',
+			action: 'setup'
 		},
 		disconnectFlow: {
 			step: 'password'
@@ -1500,7 +1501,7 @@
 		}
 	}
 
-	function closeWallet(message) {
+	function closeWallet(message, tone) {
 		window.clearInterval(state.timer);
 		window.clearTimeout(state.autoLockTimer);
 		clearSensitiveMemory();
@@ -1517,7 +1518,7 @@
 		$('#sendSummary').classList.remove('active');
 		closeMenu();
 		updateWalletUi();
-		showToast(message || 'Wallet closed.');
+		showToast(message || 'Wallet closed.', tone);
 	}
 
 	function openSavedWalletWithWif(record, wif) {
@@ -1651,6 +1652,72 @@
 			saveVaultRecord(record);
 			updateWalletUi();
 			return record;
+		});
+	}
+
+	function changeQuickUnlockPin(currentPin, newPin) {
+		var record = state.savedVault;
+		if (!record || !hasQuickPin(record)) {
+			return Promise.reject(new Error('Quick-unlock PIN is not enabled.'));
+		}
+		currentPin = normalizePin(currentPin, quickPinLength(record));
+		newPin = normalizePin(newPin, 6);
+		try {
+			validateFourOrSixDigitPin(currentPin);
+			validateFourOrSixDigitPin(newPin);
+		} catch (error) {
+			return Promise.reject(error);
+		}
+		var deviceKeyRef;
+		return getDeviceKey(false).then(function (deviceKey) {
+			deviceKeyRef = deviceKey;
+			return Vault.unwrapVaultKeyWithPin(record, currentPin, deviceKey).catch(function () {
+				return recordPinFailure(record);
+			});
+		}).then(function (vaultKeyBytes) {
+			clearPinFailures(record);
+			return Vault.wrapVaultKeyForPin(vaultKeyBytes, newPin, deviceKeyRef, record);
+		}).then(function (quickUnlock) {
+			var updated = JSON.parse(JSON.stringify(state.savedVault));
+			updated.quickUnlock = quickUnlock;
+			updated.quickUnlock.pinLength = newPin.length;
+			updated.updatedAt = new Date().toISOString();
+			saveVaultRecord(updated);
+			updateWalletUi();
+			return updated;
+		});
+	}
+
+	function deleteQuickUnlockPin(currentPin) {
+		var record = state.savedVault;
+		if (!record || !hasQuickPin(record)) {
+			return Promise.reject(new Error('Quick-unlock PIN is already disabled.'));
+		}
+		currentPin = normalizePin(currentPin, quickPinLength(record));
+		try {
+			validateFourOrSixDigitPin(currentPin);
+		} catch (error) {
+			return Promise.reject(error);
+		}
+		return getDeviceKey(false).then(function (deviceKey) {
+			return Vault.unwrapVaultKeyWithPin(record, currentPin, deviceKey).catch(function () {
+				return recordPinFailure(record);
+			});
+		}).then(function () {
+			clearPinFailures(record);
+			var updated = JSON.parse(JSON.stringify(state.savedVault));
+			updated.quickUnlock = {
+				enabled: false,
+				version: 1
+			};
+			updated.updatedAt = new Date().toISOString();
+			saveVaultRecord(updated);
+			state.settings.requirePinBeforeSend = false;
+			saveSettings();
+			return deleteDeviceKey();
+		}).then(function () {
+			updateWalletUi();
+			return state.savedVault;
 		});
 	}
 
@@ -2289,7 +2356,11 @@
 			'#setupWalletPasswordConfirm',
 			'#setupPinPassword',
 			'#setupQuickPin',
-			'#setupQuickPinConfirm'
+			'#setupQuickPinConfirm',
+			'#changeOldPin',
+			'#changeNewPin',
+			'#changeNewPinConfirm',
+			'#deletePinCurrent'
 		].forEach(function (selector) {
 			var input = $(selector);
 			if (input) {
@@ -2303,7 +2374,7 @@
 		$$('[data-pin-length]').forEach(function (button) {
 			button.classList.toggle('active', Number(button.dataset.pinLength) === state.pinSetup.pinLength);
 		});
-		['#setupQuickPin', '#setupQuickPinConfirm'].forEach(function (selector) {
+		['#setupQuickPin', '#setupQuickPinConfirm', '#changeNewPin', '#changeNewPinConfirm'].forEach(function (selector) {
 			var input = $(selector);
 			if (input) {
 				input.maxLength = state.pinSetup.pinLength;
@@ -2314,21 +2385,52 @@
 	}
 
 	function setPinSetupStep(step, message) {
-		state.pinSetup.step = step === 'pin' || step === 'blocked' ? step : 'password';
+		if (['manage', 'password', 'pin', 'change', 'delete', 'blocked'].indexOf(step) < 0) {
+			step = 'password';
+		}
+		state.pinSetup.step = step;
+		var isManage = state.pinSetup.step === 'manage';
+		var isPassword = state.pinSetup.step === 'password';
 		var isPin = state.pinSetup.step === 'pin';
+		var isChange = state.pinSetup.step === 'change';
+		var isDelete = state.pinSetup.step === 'delete';
 		var isBlocked = state.pinSetup.step === 'blocked';
-		$('#pinSetupStepLabel').textContent = isBlocked ? 'Setup paused' : (isPin ? 'Step 2 of 2' : 'Step 1 of 2');
-		$('#pinSetupPasswordStep').classList.toggle('hidden', isPin || isBlocked);
-		$('#pinSetupPinStep').classList.toggle('hidden', !isPin || isBlocked);
+		var title = isManage ? 'Manage PIN' :
+			isChange ? 'Change PIN' :
+				isDelete ? 'Delete PIN' : 'Set up PIN';
+		$('#pinSetupTitle').textContent = title;
+		$('#pinSetupStepLabel').textContent = isManage ? 'Quick unlock' :
+			isChange ? 'Change PIN' :
+				isDelete ? 'Delete PIN' :
+					isBlocked ? 'Setup paused' :
+						(isPin ? 'Step 2 of 2' : 'Step 1 of 2');
+		$('#pinSetupManageStep').classList.toggle('hidden', !isManage);
+		$('#pinSetupPasswordStep').classList.toggle('hidden', !isPassword);
+		$('#pinSetupPinStep').classList.toggle('hidden', !isPin);
+		$('#pinSetupChangeStep').classList.toggle('hidden', !isChange);
+		$('#pinSetupDeleteStep').classList.toggle('hidden', !isDelete);
 		$('#pinSetupBlockedStep').classList.toggle('hidden', !isBlocked);
 		$('#setupPinPasswordWrap').classList.toggle('hidden', !isPin || !!state.pinSetup.password);
 		if (isBlocked) {
 			$('#pinSetupBlockedMessage').textContent = message || 'PIN setup is not available right now.';
 		}
-		$('#continuePinSetup').classList.toggle('hidden', isBlocked);
-		$('#continuePinSetup').textContent = isPin ? 'Enable PIN' : 'Save Password';
-		$('#cancelPinSetup').textContent = isBlocked ? 'Close' : 'Cancel';
-		if (isPin) {
+		if ($('#changeOldPin')) {
+			$('#changeOldPin').maxLength = quickPinLength(state.savedVault);
+			$('#changeOldPin').placeholder = quickPinLength(state.savedVault) + ' digits';
+		}
+		if ($('#deletePinCurrent')) {
+			$('#deletePinCurrent').maxLength = quickPinLength(state.savedVault);
+			$('#deletePinCurrent').placeholder = quickPinLength(state.savedVault) + ' digits';
+		}
+		$('#continuePinSetup').classList.toggle('hidden', isManage || isBlocked);
+		$('#continuePinSetup').classList.toggle('danger', isDelete);
+		$('#continuePinSetup').textContent = isDelete ? 'Delete PIN' :
+			isChange ? 'Change PIN' :
+				isPin ? 'Enable PIN' : 'Save Password';
+		$('#cancelPinSetup').textContent = isManage || isBlocked ? 'Close' :
+			(isChange || isDelete ? 'Back' : 'Cancel');
+		$('#pinSetupForm .modal-actions').classList.toggle('manage-only', isManage || isBlocked);
+		if (isPin || isChange) {
 			setPinSetupLength(state.pinSetup.pinLength);
 		}
 		window.setTimeout(function () {
@@ -2336,9 +2438,16 @@
 				$('#cancelPinSetup').focus();
 				return;
 			}
-			var target = isPin ?
-				(state.pinSetup.password ? $('#setupQuickPin') : $('#setupPinPassword')) :
-				$('#setupWalletPassword');
+			var target = $('#setupWalletPassword');
+			if (isManage) {
+				target = $('#changePinOptionButton');
+			} else if (isChange) {
+				target = $('#changeOldPin');
+			} else if (isDelete) {
+				target = $('#deletePinCurrent');
+			} else if (isPin) {
+				target = state.pinSetup.password ? $('#setupQuickPin') : $('#setupPinPassword');
+			}
 			if (target) {
 				target.focus();
 			}
@@ -2350,6 +2459,7 @@
 			var message = state.mode === 'watch' ?
 				'This device only has a watch-only address. Open this wallet with its private key first, then SweetWallet can save it and set up a PIN.' :
 				'Unlock this wallet first, then set up a PIN from the balance screen.';
+			state.pinSetup.action = 'setup';
 			clearPinSetupFields();
 			$('#pinSetupModal').classList.add('active');
 			setPinSetupStep('blocked', message);
@@ -2357,9 +2467,15 @@
 			return;
 		}
 		if (state.savedVault && hasQuickPin(state.savedVault)) {
-			showToast('Quick-unlock PIN is already set up.');
+			state.pinSetup.action = 'manage';
+			state.pinSetup.password = '';
+			setPinSetupLength(quickPinLength(state.savedVault));
+			clearPinSetupFields();
+			$('#pinSetupModal').classList.add('active');
+			setPinSetupStep('manage');
 			return;
 		}
+		state.pinSetup.action = 'setup';
 		state.pinSetup.password = '';
 		setPinSetupLength(4);
 		clearPinSetupFields();
@@ -2375,9 +2491,20 @@
 
 	function closePinSetupFlow() {
 		state.pinSetup.password = '';
+		state.pinSetup.action = 'setup';
 		clearPinSetupFields();
 		$('#pinSetupModal').classList.remove('active');
 		updatePinSetupCta();
+	}
+
+	function cancelPinSetupFlow() {
+		if ((state.pinSetup.step === 'change' || state.pinSetup.step === 'delete') && state.savedVault && hasQuickPin(state.savedVault)) {
+			clearPinSetupFields();
+			state.pinSetup.action = 'manage';
+			setPinSetupStep('manage');
+			return;
+		}
+		closePinSetupFlow();
 	}
 
 	function clearDisconnectFields() {
@@ -2391,6 +2518,16 @@
 				input.value = '';
 			}
 		});
+		setDisconnectFeedback('');
+	}
+
+	function setDisconnectFeedback(message) {
+		var notice = $('#disconnectFeedback');
+		if (!notice) {
+			return;
+		}
+		notice.textContent = message || '';
+		notice.classList.toggle('hidden', !message);
 	}
 
 	function setDisconnectStep(step, message) {
@@ -2406,6 +2543,7 @@
 		$('#disconnectSaveStep').classList.toggle('hidden', !isSave);
 		$('#disconnectWatchStep').classList.toggle('hidden', !isWatch);
 		$('#disconnectBlockedStep').classList.toggle('hidden', !isBlocked);
+		setDisconnectFeedback('');
 		if (isBlocked) {
 			$('#disconnectBlockedMessage').textContent = message || 'Wallet disconnect is not available right now.';
 		}
@@ -2460,7 +2598,7 @@
 		}
 		if (state.disconnectFlow.step === 'watch') {
 			closeDisconnectFlow();
-			closeWallet('Wallet disconnected.');
+			closeWallet('Wallet disconnected.', 'danger');
 			return;
 		}
 		if (state.disconnectFlow.step === 'password') {
@@ -2469,13 +2607,18 @@
 				showToast('Enter your wallet password.', 'danger');
 				return;
 			}
+			setDisconnectFeedback('');
 			cancelButton.disabled = true;
 			setBusy(button, true, 'Checking...');
 			Vault.decryptVault(state.savedVault, password).then(function () {
 				closeDisconnectFlow();
-				closeWallet('Wallet disconnected.');
+				closeWallet('Wallet disconnected.', 'danger');
 			}).catch(function (error) {
-				showToast(error.message || 'Wallet password was not accepted.', 'danger');
+				var message = error && !/unlock|accepted|password/i.test(error.message || '') ?
+					error.message :
+					'Incorrect password.';
+				setDisconnectFeedback(message);
+				showToast(message, 'danger');
 			}).finally(function () {
 				cancelButton.disabled = false;
 				setBusy(button, false);
@@ -2493,7 +2636,7 @@
 			setBusy(button, true, 'Saving...');
 			saveCurrentPrivateKey(savePassword).then(function () {
 				closeDisconnectFlow();
-				closeWallet('Wallet saved and disconnected.');
+				closeWallet('Wallet saved and disconnected.', 'danger');
 			}).catch(function (error) {
 				showToast(error.message || 'Wallet could not be saved.', 'danger');
 			}).finally(function () {
@@ -2507,6 +2650,75 @@
 		var button = $('#continuePinSetup');
 		var cancelButton = $('#cancelPinSetup');
 		if (state.pinSetup.step === 'blocked') {
+			return;
+		}
+		if (state.pinSetup.step === 'manage') {
+			return;
+		}
+		if (state.pinSetup.step === 'change') {
+			var currentLength = quickPinLength(state.savedVault);
+			var currentPin = normalizePin($('#changeOldPin').value, currentLength);
+			var newLength = state.pinSetup.pinLength === 6 ? 6 : 4;
+			var newPin = normalizePin($('#changeNewPin').value, newLength);
+			var newPinConfirm = normalizePin($('#changeNewPinConfirm').value, newLength);
+			$('#changeOldPin').value = currentPin;
+			$('#changeNewPin').value = newPin;
+			$('#changeNewPinConfirm').value = newPinConfirm;
+			if (currentPin.length !== currentLength) {
+				showToast('Enter your current ' + currentLength + ' digit PIN.', 'danger');
+				return;
+			}
+			if (newPin.length !== newLength) {
+				showToast('Enter a ' + newLength + ' digit new PIN.', 'danger');
+				return;
+			}
+			if (newPin !== newPinConfirm) {
+				showToast('New PINs do not match.', 'danger');
+				return;
+			}
+			cancelButton.disabled = true;
+			setBusy(button, true, 'Changing...');
+			changeQuickUnlockPin(currentPin, newPin).then(function () {
+				closePinSetupFlow();
+				setLoginMode('pin');
+				showToast('PIN changed.');
+			}).catch(function (error) {
+				var errorMessage = (error && error.message) || '';
+				var message = /accepted/i.test(errorMessage) ? 'Current PIN was not accepted.' : (errorMessage || 'PIN could not be changed.');
+				showToast(message, 'danger');
+			}).finally(function () {
+				cancelButton.disabled = false;
+				setBusy(button, false);
+				if ($('#pinSetupModal').classList.contains('active')) {
+					setPinSetupStep('change');
+				}
+			});
+			return;
+		}
+		if (state.pinSetup.step === 'delete') {
+			var deleteLength = quickPinLength(state.savedVault);
+			var deletePin = normalizePin($('#deletePinCurrent').value, deleteLength);
+			$('#deletePinCurrent').value = deletePin;
+			if (deletePin.length !== deleteLength) {
+				showToast('Enter your current ' + deleteLength + ' digit PIN.', 'danger');
+				return;
+			}
+			cancelButton.disabled = true;
+			setBusy(button, true, 'Deleting...');
+			deleteQuickUnlockPin(deletePin).then(function () {
+				closePinSetupFlow();
+				showToast('PIN deleted.');
+			}).catch(function (error) {
+				var errorMessage = (error && error.message) || '';
+				var message = /accepted/i.test(errorMessage) ? 'Current PIN was not accepted.' : (errorMessage || 'PIN could not be deleted.');
+				showToast(message, 'danger');
+			}).finally(function () {
+				cancelButton.disabled = false;
+				setBusy(button, false);
+				if ($('#pinSetupModal').classList.contains('active')) {
+					setPinSetupStep('delete');
+				}
+			});
 			return;
 		}
 		if (state.pinSetup.step === 'password') {
@@ -2825,7 +3037,20 @@
 			submitPinSetup();
 		});
 
-		$('#cancelPinSetup').addEventListener('click', closePinSetupFlow);
+		$('#cancelPinSetup').addEventListener('click', cancelPinSetupFlow);
+
+		$('#changePinOptionButton').addEventListener('click', function () {
+			state.pinSetup.action = 'change';
+			setPinSetupLength(quickPinLength(state.savedVault));
+			clearPinSetupFields();
+			setPinSetupStep('change');
+		});
+
+		$('#deletePinOptionButton').addEventListener('click', function () {
+			state.pinSetup.action = 'delete';
+			clearPinSetupFields();
+			setPinSetupStep('delete');
+		});
 
 		$('#disconnectWalletForm').addEventListener('submit', function (event) {
 			event.preventDefault();
@@ -2840,7 +3065,7 @@
 			});
 		});
 
-		['#setupQuickPin', '#setupQuickPinConfirm', '#quickPin'].forEach(function (selector) {
+		['#setupQuickPin', '#setupQuickPinConfirm', '#quickPin', '#changeOldPin', '#changeNewPin', '#changeNewPinConfirm', '#deletePinCurrent'].forEach(function (selector) {
 			var input = $(selector);
 			if (input) {
 				input.addEventListener('input', function () {
