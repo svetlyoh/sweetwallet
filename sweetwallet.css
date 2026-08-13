@@ -1704,14 +1704,16 @@ select:focus {
 }
 
 .pin-setup-card input,
-.disconnect-wallet-card input {
+.disconnect-wallet-card input,
+.disconnect-wallet-card textarea {
 	border-color: rgba(255, 255, 255, 0.18);
 	background: rgba(2, 62, 39, 0.78);
 	color: white;
 }
 
 .pin-setup-card input::placeholder,
-.disconnect-wallet-card input::placeholder {
+.disconnect-wallet-card input::placeholder,
+.disconnect-wallet-card textarea::placeholder {
 	color: rgba(255, 255, 255, 0.58);
 }
 
@@ -1727,6 +1729,23 @@ select:focus {
 
 .disconnect-wallet-card label {
 	color: rgba(255, 255, 255, 0.88);
+}
+
+.disconnect-backup-box {
+	display: grid;
+	gap: 8px;
+	padding: 10px;
+	border: 1px solid rgba(132, 217, 150, 0.24);
+	border-radius: 8px;
+	background: rgba(1, 63, 39, 0.56);
+}
+
+.disconnect-backup-box textarea {
+	min-height: 86px;
+	resize: vertical;
+	font-size: 0.72rem;
+	line-height: 1.35;
+	word-break: break-all;
 }
 
 .qr-scanner-card {

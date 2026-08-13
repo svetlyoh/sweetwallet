@@ -297,12 +297,13 @@
 									</div>
 								</div>
 								<div class="key-field">
-									<label>Private key backup</label>
-									<div class="notice warning">Private-key export now requires reauthentication. Use Security & Wallet Pin to open the backup screen.</div>
-									<button class="button subtle" type="button" data-tab="security">
-										<i data-lucide="shield-check"></i>
-										Open Security
-									</button>
+									<label for="keyPrivate">Private key backup</label>
+									<div class="field-pair">
+										<input id="keyPrivate" class="monospace" readonly>
+										<button class="copy-button" type="button" data-copy-target="#keyPrivate" aria-label="Copy private key">
+											<i data-lucide="copy"></i>
+										</button>
+									</div>
 								</div>
 								<div class="key-field">
 									<label for="keyRedeem">SegWit redeem script</label>
@@ -400,8 +401,8 @@
 											Convert to Watch-Only Wallet
 										</button>
 										<button id="deleteWalletButton" class="button danger" type="button">
-											<i data-lucide="trash-2"></i>
-											Delete Wallet From Device
+											<i data-lucide="unlink"></i>
+											Disconnect Wallet
 										</button>
 									</section>
 
@@ -677,15 +678,15 @@
 				<div class="pin-setup-kicker" id="disconnectStepLabel">Secure disconnect</div>
 				<h2>Disconnect Wallet</h2>
 				<div id="disconnectPasswordStep" class="disconnect-step">
-					<div class="notice">Enter your wallet password before disconnecting.</div>
+					<div class="notice warning">Disconnecting requires you to save your private key first. Enter your password to view and copy it before disconnecting.</div>
 					<div class="form-row">
-						<label for="disconnectPassword">Wallet password</label>
+						<label for="disconnectPassword">Type Password</label>
 						<input id="disconnectPassword" type="password" autocomplete="current-password" placeholder="Enter wallet password">
 					</div>
 					<div id="disconnectFeedback" class="notice danger hidden">Incorrect password.</div>
 				</div>
 				<div id="disconnectSaveStep" class="disconnect-step hidden">
-					<div class="notice warning">This wallet is only open for this session. Save it with a password before disconnecting.</div>
+					<div class="notice warning">This wallet is only open for this session. Save it with a password, then copy the private key before disconnecting.</div>
 					<div class="form-row">
 						<label for="disconnectSavePassword">New wallet password</label>
 						<input id="disconnectSavePassword" type="password" autocomplete="new-password" placeholder="At least 10 characters">
@@ -697,6 +698,17 @@
 				</div>
 				<div id="disconnectWatchStep" class="disconnect-step hidden">
 					<div class="notice">This is a watch-only wallet. Disconnecting closes it on this screen and does not affect the blockchain.</div>
+				</div>
+				<div id="disconnectBackupStep" class="disconnect-step hidden">
+					<div class="notice warning">Copy this private key now. Anyone with this key can spend this wallet.</div>
+					<div class="disconnect-backup-box">
+						<label for="disconnectBackupWif">Private key</label>
+						<textarea id="disconnectBackupWif" class="monospace" readonly spellcheck="false"></textarea>
+						<button id="copyDisconnectBackup" class="button subtle" type="button" data-copy-target="#disconnectBackupWif">
+							<i data-lucide="copy"></i>
+							Quick Copy Key
+						</button>
+					</div>
 				</div>
 				<div id="disconnectBlockedStep" class="disconnect-step hidden">
 					<div id="disconnectBlockedMessage" class="notice danger">Wallet disconnect is not available right now.</div>

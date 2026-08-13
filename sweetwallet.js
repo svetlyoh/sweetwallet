@@ -82,7 +82,8 @@
 			action: 'setup'
 		},
 		disconnectFlow: {
-			step: 'password'
+			step: 'password',
+			backupWif: ''
 		},
 		starterFundingRequested: {}
 	};
@@ -767,6 +768,7 @@
 		}
 		$('#keyAddress').value = state.address;
 		$('#keyPublic').value = pubkey;
+		$('#keyPrivate').value = state.keys ? state.keys.toWIF() : '';
 		$('#keyRedeem').value = redeem;
 	}
 
@@ -1407,6 +1409,9 @@
 		state.pendingTx = null;
 		state.pendingPlan = null;
 		state.lastTxHex = '';
+		if ($('#keyPrivate')) {
+			$('#keyPrivate').value = '';
+		}
 		$('#backupWif').value = '';
 		$('#backupBox').classList.add('hidden');
 	}
@@ -1762,7 +1767,7 @@
 		showToast('The saved private key has been removed from this device.');
 	}
 
-	function deleteWalletFromDevice() {
+	function deleteWalletFromDevice(message, tone) {
 		storageRemove(STORAGE.vault);
 		storageRemove(STORAGE.publicWallet);
 		storageRemove(STORAGE.securityKeys);
@@ -1771,8 +1776,7 @@
 		deleteDeviceKey();
 		loadSettings();
 		loadStoredRecords();
-		closeWallet();
-		showToast('Wallet records were deleted from this device. Blockchain history remains public.');
+		closeWallet(message || 'Wallet records were deleted from this device. Blockchain history remains public.', tone);
 	}
 
 	function loadSecurityKeys() {
@@ -2511,13 +2515,15 @@
 		[
 			'#disconnectPassword',
 			'#disconnectSavePassword',
-			'#disconnectSavePasswordConfirm'
+			'#disconnectSavePasswordConfirm',
+			'#disconnectBackupWif'
 		].forEach(function (selector) {
 			var input = $(selector);
 			if (input) {
 				input.value = '';
 			}
 		});
+		state.disconnectFlow.backupWif = '';
 		setDisconnectFeedback('');
 	}
 
@@ -2535,25 +2541,33 @@
 		var isPassword = state.disconnectFlow.step === 'password';
 		var isSave = state.disconnectFlow.step === 'save';
 		var isWatch = state.disconnectFlow.step === 'watch';
+		var isBackup = state.disconnectFlow.step === 'backup';
 		var isBlocked = state.disconnectFlow.step === 'blocked';
 		$('#disconnectStepLabel').textContent = isSave ? 'Save before disconnecting' :
 			isWatch ? 'Watch-only wallet' :
-				isBlocked ? 'Disconnect paused' : 'Secure disconnect';
+				isBackup ? 'Save private key' :
+					isBlocked ? 'Disconnect paused' : 'Secure disconnect';
 		$('#disconnectPasswordStep').classList.toggle('hidden', !isPassword);
 		$('#disconnectSaveStep').classList.toggle('hidden', !isSave);
 		$('#disconnectWatchStep').classList.toggle('hidden', !isWatch);
+		$('#disconnectBackupStep').classList.toggle('hidden', !isBackup);
 		$('#disconnectBlockedStep').classList.toggle('hidden', !isBlocked);
+		if (isBackup && $('#disconnectBackupWif')) {
+			$('#disconnectBackupWif').value = state.disconnectFlow.backupWif || '';
+		}
 		setDisconnectFeedback('');
 		if (isBlocked) {
 			$('#disconnectBlockedMessage').textContent = message || 'Wallet disconnect is not available right now.';
 		}
 		$('#continueDisconnectWallet').classList.toggle('hidden', isBlocked);
-		$('#continueDisconnectWallet').textContent = isSave ? 'Save & Disconnect' : 'Disconnect';
+		$('#continueDisconnectWallet').textContent = isSave ? 'Save & Show Key' :
+			isBackup ? 'Disconnect Now' : 'Disconnect';
 		$('#cancelDisconnectWallet').textContent = isBlocked ? 'Close' : 'Cancel';
 		window.setTimeout(function () {
 			var target = isPassword ? $('#disconnectPassword') :
 				isSave ? $('#disconnectSavePassword') :
-					$('#continueDisconnectWallet');
+					isBackup ? $('#copyDisconnectBackup') :
+						$('#continueDisconnectWallet');
 			if (target) {
 				target.focus();
 			}
@@ -2601,6 +2615,11 @@
 			closeWallet('Wallet disconnected.', 'danger');
 			return;
 		}
+		if (state.disconnectFlow.step === 'backup') {
+			closeDisconnectFlow();
+			closeWallet('Wallet disconnected.', 'danger');
+			return;
+		}
 		if (state.disconnectFlow.step === 'password') {
 			var password = $('#disconnectPassword').value;
 			if (!password) {
@@ -2610,9 +2629,10 @@
 			setDisconnectFeedback('');
 			cancelButton.disabled = true;
 			setBusy(button, true, 'Checking...');
-			Vault.decryptVault(state.savedVault, password).then(function () {
-				closeDisconnectFlow();
-				closeWallet('Wallet disconnected.', 'danger');
+			Vault.decryptVault(state.savedVault, password).then(function (wif) {
+				state.disconnectFlow.backupWif = wif;
+				$('#disconnectPassword').value = '';
+				setDisconnectStep('backup');
 			}).catch(function (error) {
 				var message = error && !/unlock|accepted|password/i.test(error.message || '') ?
 					error.message :
@@ -2622,6 +2642,9 @@
 			}).finally(function () {
 				cancelButton.disabled = false;
 				setBusy(button, false);
+				if ($('#disconnectWalletModal').classList.contains('active') && state.disconnectFlow.step === 'backup') {
+					button.textContent = 'Disconnect Now';
+				}
 			});
 			return;
 		}
@@ -2635,13 +2658,18 @@
 			cancelButton.disabled = true;
 			setBusy(button, true, 'Saving...');
 			saveCurrentPrivateKey(savePassword).then(function () {
-				closeDisconnectFlow();
-				closeWallet('Wallet saved and disconnected.', 'danger');
+				state.disconnectFlow.backupWif = state.keys ? state.keys.toWIF() : '';
+				$('#disconnectSavePassword').value = '';
+				$('#disconnectSavePasswordConfirm').value = '';
+				setDisconnectStep('backup');
 			}).catch(function (error) {
 				showToast(error.message || 'Wallet could not be saved.', 'danger');
 			}).finally(function () {
 				cancelButton.disabled = false;
 				setBusy(button, false);
+				if ($('#disconnectWalletModal').classList.contains('active') && state.disconnectFlow.step === 'backup') {
+					button.textContent = 'Disconnect Now';
+				}
 			});
 		}
 	}
@@ -3215,18 +3243,7 @@
 		});
 
 		$('#deleteWalletButton').addEventListener('click', function () {
-			if (!window.confirm('Delete all SweetWallet records from this device? Public blockchain history cannot be deleted.')) {
-				return;
-			}
-			var phrase = window.prompt('Type DELETE WALLET to confirm.');
-			if (phrase !== 'DELETE WALLET') {
-				showToast('Delete cancelled.');
-				return;
-			}
-			var passwordCheck = state.savedVault ? requireSavedWalletPassword('Enter your wallet password to delete this wallet from the device.') : Promise.resolve();
-			passwordCheck.then(deleteWalletFromDevice).catch(function (error) {
-				showToast(error.message || 'Wallet was not deleted.', 'danger');
-			});
+			openDisconnectFlow();
 		});
 
 		$('#changePasswordForm').addEventListener('submit', function (event) {
