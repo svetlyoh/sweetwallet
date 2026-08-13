@@ -689,6 +689,36 @@ select:focus {
 	font-weight: 800;
 }
 
+.setup-pin-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	width: 100%;
+	min-height: 48px;
+	margin-top: 12px;
+	border: 0;
+	border-radius: 8px;
+	background: #0c8d4b;
+	color: white;
+	font-size: 0.86rem;
+	font-weight: 800;
+	text-transform: uppercase;
+}
+
+.setup-pin-button:hover,
+.setup-pin-button:focus-visible {
+	background: #0a7a43;
+	color: white;
+	outline: 2px solid rgba(123, 227, 143, 0.45);
+	outline-offset: 2px;
+}
+
+.setup-pin-button svg {
+	width: 20px;
+	height: 20px;
+}
+
 .address-box {
 	margin-top: 14px;
 	padding: 12px;
@@ -1449,6 +1479,42 @@ select:focus {
 .modal-card .button.secondary:hover,
 .modal-card .button.secondary:focus-visible {
 	background: rgba(1, 63, 39, 0.76);
+}
+
+.pin-setup-card {
+	display: grid;
+	gap: 12px;
+}
+
+.pin-setup-kicker {
+	width: max-content;
+	padding: 5px 8px;
+	border: 1px solid rgba(132, 217, 150, 0.24);
+	border-radius: 999px;
+	background: rgba(1, 63, 39, 0.52);
+	color: rgba(237, 255, 243, 0.88);
+	font-size: 0.72rem;
+	font-weight: 800;
+	text-transform: uppercase;
+}
+
+.pin-setup-step {
+	display: grid;
+	gap: 10px;
+}
+
+.pin-setup-card label {
+	color: rgba(255, 255, 255, 0.88);
+}
+
+.pin-setup-card input {
+	border-color: rgba(255, 255, 255, 0.18);
+	background: rgba(2, 62, 39, 0.78);
+	color: white;
+}
+
+.pin-setup-card input::placeholder {
+	color: rgba(255, 255, 255, 0.58);
 }
 
 .qr-scanner-card {

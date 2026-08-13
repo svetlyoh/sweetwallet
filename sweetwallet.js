@@ -74,6 +74,10 @@
 			detecting: false,
 			lastInvalid: ''
 		},
+		pinSetup: {
+			step: 'password',
+			password: ''
+		},
 		starterFundingRequested: {}
 	};
 
@@ -181,6 +185,16 @@
 
 	function hasQuickPin(record) {
 		return !!(record && record.quickUnlock && record.quickUnlock.enabled);
+	}
+
+	function normalizeSixDigitPin(value) {
+		return String(value || '').replace(/\D/g, '').slice(0, 6);
+	}
+
+	function validateSixDigitPin(value) {
+		if (!/^\d{6}$/.test(String(value || ''))) {
+			throw new Error('Use a 6-digit PIN.');
+		}
 	}
 
 	function vaultAvailabilityError() {
@@ -981,6 +995,21 @@
 		updateLoginUi();
 		updateLockedUi();
 		updateMenuUi();
+		updatePinSetupCta();
+	}
+
+	function updatePinSetupCta() {
+		var button = $('#setupPinPromptButton');
+		var status = $('#walletStatusPill');
+		if (!button || !status) {
+			return;
+		}
+		var needsPinSetup = !!state.keys &&
+			state.mode !== 'locked' &&
+			state.mode !== 'watch' &&
+			(!state.savedVault || !hasQuickPin(state.savedVault));
+		button.classList.toggle('hidden', !needsPinSetup);
+		status.classList.toggle('hidden', needsPinSetup);
 	}
 
 	function updateMenuUi() {
@@ -1010,7 +1039,7 @@
 	}
 
 	function pinValue() {
-		return ($('#pinInput') && $('#pinInput').value || '').replace(/\D/g, '').slice(0, 6);
+		return normalizeSixDigitPin($('#pinInput') && $('#pinInput').value);
 	}
 
 	function updatePinBoxes() {
@@ -1137,7 +1166,7 @@
 	}
 
 	function lockedPinValue() {
-		return ($('#lockedPinInput') && $('#lockedPinInput').value || '').replace(/\D/g, '').slice(0, 6);
+		return normalizeSixDigitPin($('#lockedPinInput') && $('#lockedPinInput').value);
 	}
 
 	function updateLockedPinBoxes() {
@@ -1571,6 +1600,32 @@
 			state.walletId = record.walletId;
 			saveVaultRecord(record);
 			state.mode = 'saved';
+			updateWalletUi();
+			return record;
+		});
+	}
+
+	function enableQuickUnlockPin(password, pin) {
+		if (!state.savedVault) {
+			return Promise.reject(new Error('Save the private key before enabling quick-unlock PIN.'));
+		}
+		pin = normalizeSixDigitPin(pin);
+		try {
+			validateSixDigitPin(pin);
+		} catch (error) {
+			return Promise.reject(error);
+		}
+		var vaultKeyBytes;
+		return Vault.getVaultKeyBytes(state.savedVault, password).then(function (bytes) {
+			vaultKeyBytes = bytes;
+			return getDeviceKey(true);
+		}).then(function (deviceKey) {
+			return Vault.wrapVaultKeyForPin(vaultKeyBytes, pin, deviceKey, state.savedVault);
+		}).then(function (quickUnlock) {
+			var record = JSON.parse(JSON.stringify(state.savedVault));
+			record.quickUnlock = quickUnlock;
+			record.updatedAt = new Date().toISOString();
+			saveVaultRecord(record);
 			updateWalletUi();
 			return record;
 		});
@@ -2205,6 +2260,135 @@
 		$('#confirmModal').classList.remove('active');
 	}
 
+	function clearPinSetupFields() {
+		[
+			'#setupWalletPassword',
+			'#setupWalletPasswordConfirm',
+			'#setupPinPassword',
+			'#setupQuickPin',
+			'#setupQuickPinConfirm'
+		].forEach(function (selector) {
+			var input = $(selector);
+			if (input) {
+				input.value = '';
+			}
+		});
+	}
+
+	function setPinSetupStep(step) {
+		state.pinSetup.step = step === 'pin' ? 'pin' : 'password';
+		var isPin = state.pinSetup.step === 'pin';
+		$('#pinSetupStepLabel').textContent = isPin ? 'Step 2 of 2' : 'Step 1 of 2';
+		$('#pinSetupPasswordStep').classList.toggle('hidden', isPin);
+		$('#pinSetupPinStep').classList.toggle('hidden', !isPin);
+		$('#setupPinPasswordWrap').classList.toggle('hidden', !isPin || !!state.pinSetup.password);
+		$('#continuePinSetup').textContent = isPin ? 'Enable PIN' : 'Save Password';
+		window.setTimeout(function () {
+			var target = isPin ?
+				(state.pinSetup.password ? $('#setupQuickPin') : $('#setupPinPassword')) :
+				$('#setupWalletPassword');
+			if (target) {
+				target.focus();
+			}
+		}, 0);
+	}
+
+	function openPinSetupFlow() {
+		if (!state.keys) {
+			showToast('Open a wallet before setting up a PIN.', 'danger');
+			return;
+		}
+		if (state.savedVault && hasQuickPin(state.savedVault)) {
+			showToast('Quick-unlock PIN is already set up.');
+			return;
+		}
+		var cryptoError = vaultAvailabilityError();
+		if (cryptoError) {
+			showToast(cryptoError, 'danger');
+			return;
+		}
+		state.pinSetup.password = '';
+		clearPinSetupFields();
+		$('#pinSetupModal').classList.add('active');
+		setPinSetupStep(state.savedVault ? 'pin' : 'password');
+	}
+
+	function closePinSetupFlow() {
+		state.pinSetup.password = '';
+		clearPinSetupFields();
+		$('#pinSetupModal').classList.remove('active');
+		updatePinSetupCta();
+	}
+
+	function submitPinSetup() {
+		var button = $('#continuePinSetup');
+		var cancelButton = $('#cancelPinSetup');
+		if (state.pinSetup.step === 'password') {
+			var password = $('#setupWalletPassword').value;
+			var confirmPassword = $('#setupWalletPasswordConfirm').value;
+			if (password !== confirmPassword) {
+				showToast('Wallet passwords do not match.', 'danger');
+				return;
+			}
+			cancelButton.disabled = true;
+			setBusy(button, true, 'Saving...');
+			saveCurrentPrivateKey(password).then(function () {
+				state.pinSetup.password = password;
+				$('#setupWalletPassword').value = '';
+				$('#setupWalletPasswordConfirm').value = '';
+				setSecurityCapabilityNotice('Private key saved encrypted on this device.');
+				setPinSetupStep('pin');
+				showToast('Wallet saved. Now choose your PIN.');
+			}).catch(function (error) {
+				var message = error.message || 'Wallet could not be saved.';
+				if (/HTTPS|localhost|Web Crypto|Secure browser crypto|Secure random/i.test(message)) {
+					setSecurityCapabilityNotice(message + ' Reopen SweetWallet from HTTPS or localhost before saving it encrypted.', 'danger');
+				}
+				showToast(message, 'danger');
+			}).finally(function () {
+				cancelButton.disabled = false;
+				setBusy(button, false);
+				setPinSetupStep(state.pinSetup.step);
+			});
+			return;
+		}
+
+		var passwordForPin = state.pinSetup.password || $('#setupPinPassword').value;
+		var pin = normalizeSixDigitPin($('#setupQuickPin').value);
+		var confirmPin = normalizeSixDigitPin($('#setupQuickPinConfirm').value);
+		$('#setupQuickPin').value = pin;
+		$('#setupQuickPinConfirm').value = confirmPin;
+		if (!passwordForPin) {
+			showToast('Enter your wallet password.', 'danger');
+			return;
+		}
+		if (pin !== confirmPin) {
+			showToast('PINs do not match.', 'danger');
+			return;
+		}
+		try {
+			validateSixDigitPin(pin);
+		} catch (error) {
+			showToast(error.message, 'danger');
+			return;
+		}
+		cancelButton.disabled = true;
+		setBusy(button, true, 'Enabling...');
+		enableQuickUnlockPin(passwordForPin, pin).then(function () {
+			closePinSetupFlow();
+			setLoginMode('pin');
+			showToast('PIN enabled. SweetWallet is saved on this device.');
+		}).catch(function (error) {
+			showToast(error.message || 'Quick-unlock PIN could not be enabled.', 'danger');
+		}).finally(function () {
+			cancelButton.disabled = false;
+			setBusy(button, false);
+			if ($('#pinSetupModal').classList.contains('active')) {
+				setPinSetupStep('pin');
+			}
+		});
+	}
+
 	function askSecret(title, label, placeholder, inputMode) {
 		return new Promise(function (resolve, reject) {
 			var modal = document.createElement('div');
@@ -2427,6 +2611,24 @@
 			copyValue(state.address);
 		});
 
+		$('#setupPinPromptButton').addEventListener('click', openPinSetupFlow);
+
+		$('#pinSetupForm').addEventListener('submit', function (event) {
+			event.preventDefault();
+			submitPinSetup();
+		});
+
+		$('#cancelPinSetup').addEventListener('click', closePinSetupFlow);
+
+		['#setupQuickPin', '#setupQuickPinConfirm', '#quickPin'].forEach(function (selector) {
+			var input = $(selector);
+			if (input) {
+				input.addEventListener('input', function () {
+					input.value = normalizeSixDigitPin(input.value);
+				});
+			}
+		});
+
 		$$('[data-copy-target]').forEach(function (button) {
 			button.addEventListener('click', function () {
 				var target = $(button.dataset.copyTarget);
@@ -2614,17 +2816,7 @@
 			}
 			var button = $('#setPinButton');
 			setBusy(button, true, 'Protecting...');
-			var vaultKeyBytes;
-			Vault.getVaultKeyBytes(state.savedVault, $('#pinPassword').value).then(function (bytes) {
-				vaultKeyBytes = bytes;
-				return getDeviceKey(true);
-			}).then(function (deviceKey) {
-				return Vault.wrapVaultKeyForPin(vaultKeyBytes, $('#quickPin').value, deviceKey, state.savedVault);
-			}).then(function (quickUnlock) {
-				var record = JSON.parse(JSON.stringify(state.savedVault));
-				record.quickUnlock = quickUnlock;
-				record.updatedAt = new Date().toISOString();
-				saveVaultRecord(record);
+			enableQuickUnlockPin($('#pinPassword').value, $('#quickPin').value).then(function () {
 				$('#pinPassword').value = '';
 				$('#quickPin').value = '';
 				showToast('Quick-unlock PIN enabled. The PIN is combined with this browser device key.');

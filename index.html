@@ -133,10 +133,14 @@
 										</button>
 									</div>
 								</div>
-								<div class="status-pill">
+								<div id="walletStatusPill" class="status-pill">
 									<i data-lucide="shield-check"></i>
 									<span id="walletStatus">Local key</span>
 								</div>
+								<button id="setupPinPromptButton" class="setup-pin-button hidden" type="button">
+									<i data-lucide="shield-plus"></i>
+									<span>Set up PIN</span>
+								</button>
 							</div>
 						</section>
 
@@ -427,7 +431,7 @@
 											</div>
 											<div class="form-row">
 												<label for="quickPin">Quick-unlock PIN</label>
-												<input id="quickPin" type="password" inputmode="numeric" autocomplete="off" placeholder="6+ digits">
+												<input id="quickPin" type="password" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="6 digits">
 											</div>
 											<button id="setPinButton" class="button subtle" type="submit">
 												<i data-lucide="hash"></i>
@@ -562,6 +566,43 @@
 					<button id="closeQrScanner" class="button secondary" type="button">Cancel</button>
 				</div>
 			</div>
+		</div>
+
+		<div id="pinSetupModal" class="modal pin-setup-modal" role="dialog" aria-modal="true" aria-label="Set up SweetWallet PIN">
+			<form id="pinSetupForm" class="modal-card pin-setup-card" autocomplete="off">
+				<div class="pin-setup-kicker" id="pinSetupStepLabel">Step 1 of 2</div>
+				<h2>Set up PIN</h2>
+				<div id="pinSetupPasswordStep" class="pin-setup-step">
+					<div class="notice">First, make a wallet password. This saves your wallet safely on this device.</div>
+					<div class="form-row">
+						<label for="setupWalletPassword">Wallet password</label>
+						<input id="setupWalletPassword" type="password" autocomplete="new-password" placeholder="At least 10 characters">
+					</div>
+					<div class="form-row">
+						<label for="setupWalletPasswordConfirm">Confirm wallet password</label>
+						<input id="setupWalletPasswordConfirm" type="password" autocomplete="new-password">
+					</div>
+				</div>
+				<div id="pinSetupPinStep" class="pin-setup-step hidden">
+					<div class="notice">Now pick a 6-digit PIN for quick unlock on this browser.</div>
+					<div id="setupPinPasswordWrap" class="form-row hidden">
+						<label for="setupPinPassword">Wallet password</label>
+						<input id="setupPinPassword" type="password" autocomplete="current-password" placeholder="Enter wallet password">
+					</div>
+					<div class="form-row">
+						<label for="setupQuickPin">Quick-unlock PIN</label>
+						<input id="setupQuickPin" type="password" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="6 digits">
+					</div>
+					<div class="form-row">
+						<label for="setupQuickPinConfirm">Confirm PIN</label>
+						<input id="setupQuickPinConfirm" type="password" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="6 digits">
+					</div>
+				</div>
+				<div class="modal-actions">
+					<button id="cancelPinSetup" class="button secondary" type="button">Cancel</button>
+					<button id="continuePinSetup" class="button" type="submit">Continue</button>
+				</div>
+			</form>
 		</div>
 
 		<div id="toast" class="toast" role="status" aria-live="polite"></div>
