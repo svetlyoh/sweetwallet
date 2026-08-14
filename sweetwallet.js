@@ -2546,8 +2546,6 @@
 	function clearDisconnectFields() {
 		[
 			'#disconnectPassword',
-			'#disconnectSavePassword',
-			'#disconnectSavePasswordConfirm',
 			'#disconnectBackupWif'
 		].forEach(function (selector) {
 			var input = $(selector);
@@ -2571,16 +2569,13 @@
 	function setDisconnectStep(step, message) {
 		state.disconnectFlow.step = step || 'password';
 		var isPassword = state.disconnectFlow.step === 'password';
-		var isSave = state.disconnectFlow.step === 'save';
 		var isWatch = state.disconnectFlow.step === 'watch';
 		var isBackup = state.disconnectFlow.step === 'backup';
 		var isBlocked = state.disconnectFlow.step === 'blocked';
-		$('#disconnectStepLabel').textContent = isSave ? 'Save before disconnecting' :
-			isWatch ? 'Watch-only wallet' :
+		$('#disconnectStepLabel').textContent = isWatch ? 'Watch-only wallet' :
 				isBackup ? 'Save private key' :
 					isBlocked ? 'Disconnect paused' : 'Secure disconnect';
 		$('#disconnectPasswordStep').classList.toggle('hidden', !isPassword);
-		$('#disconnectSaveStep').classList.toggle('hidden', !isSave);
 		$('#disconnectWatchStep').classList.toggle('hidden', !isWatch);
 		$('#disconnectBackupStep').classList.toggle('hidden', !isBackup);
 		$('#disconnectBlockedStep').classList.toggle('hidden', !isBlocked);
@@ -2592,13 +2587,11 @@
 			$('#disconnectBlockedMessage').textContent = message || 'Wallet disconnect is not available right now.';
 		}
 		$('#continueDisconnectWallet').classList.toggle('hidden', isBlocked);
-		$('#continueDisconnectWallet').textContent = isSave ? 'Save & Show Key' :
-			isBackup ? 'Disconnect Now' : 'Disconnect';
+		$('#continueDisconnectWallet').textContent = isBackup ? 'Disconnect Now' : 'Disconnect';
 		$('#cancelDisconnectWallet').textContent = isBlocked ? 'Close' : 'Cancel';
 		window.setTimeout(function () {
 			var target = isPassword ? $('#disconnectPassword') :
-				isSave ? $('#disconnectSavePassword') :
-					isBackup ? $('#copyDisconnectBackup') :
+				isBackup ? $('#copyDisconnectBackup') :
 						$('#continueDisconnectWallet');
 			if (target) {
 				target.focus();
@@ -2619,13 +2612,8 @@
 			return;
 		}
 		if (state.keys) {
-			var cryptoError = vaultAvailabilityError();
-			if (cryptoError) {
-				setDisconnectStep('blocked', cryptoError + ' Export a backup before closing this session.');
-				showToast(cryptoError, 'danger');
-				return;
-			}
-			setDisconnectStep('save');
+			state.disconnectFlow.backupWif = state.keys.toWIF();
+			setDisconnectStep('backup');
 			return;
 		}
 		setDisconnectStep('watch');
@@ -2679,30 +2667,6 @@
 				}
 			});
 			return;
-		}
-		if (state.disconnectFlow.step === 'save') {
-			var savePassword = $('#disconnectSavePassword').value;
-			var confirmPassword = $('#disconnectSavePasswordConfirm').value;
-			if (savePassword !== confirmPassword) {
-				showToast('Wallet passwords do not match.', 'danger');
-				return;
-			}
-			cancelButton.disabled = true;
-			setBusy(button, true, 'Saving...');
-			saveCurrentPrivateKey(savePassword).then(function () {
-				state.disconnectFlow.backupWif = state.keys ? state.keys.toWIF() : '';
-				$('#disconnectSavePassword').value = '';
-				$('#disconnectSavePasswordConfirm').value = '';
-				setDisconnectStep('backup');
-			}).catch(function (error) {
-				showToast(error.message || 'Wallet could not be saved.', 'danger');
-			}).finally(function () {
-				cancelButton.disabled = false;
-				setBusy(button, false);
-				if ($('#disconnectWalletModal').classList.contains('active') && state.disconnectFlow.step === 'backup') {
-					button.textContent = 'Disconnect Now';
-				}
-			});
 		}
 	}
 
