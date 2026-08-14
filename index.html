@@ -26,6 +26,16 @@
 		<link rel="stylesheet" href="sweetwallet.css">
 	</head>
 	<body>
+		<div class="crypto-field" aria-hidden="true">
+			<span># SHA-256 &nbsp; 6a09e667bb67ae85 &nbsp; 0x3c6ef372a54ff53a &nbsp; nonce: 510e527fade682d1</span>
+			<span>0000000000000000004f3a7c91 &nbsp; #BLOCK &nbsp; merkle: 9b05688c2b3e6c1f &nbsp; 1f83d9abfb41bd6b</span>
+			<span>0x5be0cd19137e2179 &nbsp; #HASHED &nbsp; 428a2f98d728ae22 &nbsp; difficulty: 7137449123ef65cd</span>
+			<span># SUGAR/CHAIN &nbsp; 12835b01d807aa98 &nbsp; 243185be550c7dc3 &nbsp; 72be5d74f27b896f</span>
+			<span>proof: 80deb1fe3b1696b1 &nbsp; #DECENTRALIZED &nbsp; 9bdc06a7c19bf174 &nbsp; e49b69c1efbe4786</span>
+			<span>0x0fc19dc68b8cd5b5 &nbsp; #VERIFY &nbsp; 240ca1cc2de92c6f &nbsp; 4a7484aa5cb0a9dc</span>
+			<span># SELF-CUSTODY &nbsp; 76f988da983e5152 &nbsp; a831c66d2db43210 &nbsp; bf597fc7beef0ee4</span>
+			<span>c6e00bf33da88fc2 &nbsp; #PEER/TO/PEER &nbsp; d5a79147930aa725 &nbsp; 06ca6351e003826f</span>
+		</div>
 		<div class="shell">
 			<header class="app-header">
 				<div class="brand">
@@ -53,7 +63,9 @@
 				<section id="loginScreen" class="screen active">
 					<div class="login-card">
 						<div class="login-title-row">
-							<div>
+							<div class="login-heading">
+								<div class="login-eyebrow"><i data-lucide="shield-check"></i><span>Local &amp; encrypted</span></div>
+								<h2 class="login-title">Welcome back</h2>
 								<p class="login-copy">Unlock a saved wallet, or use a private key for this session.</p>
 							</div>
 							<button id="createWallet" class="new-wallet-button" type="button" aria-label="Create new wallet">
@@ -105,7 +117,7 @@
 								</button>
 							</div>
 						</div>
-						<div class="notice login-helper-note">New wallets stay temporary until you save them in Security.</div>
+						<div class="notice login-helper-note"><i data-lucide="shield"></i><span>New wallets stay temporary until you save them in Security.</span></div>
 					</div>
 				</section>
 
@@ -266,12 +278,6 @@
 										Review Send
 									</button>
 								</form>
-								<div id="sendSummary" class="send-summary">
-									<div class="summary-line"><span>To</span><strong id="summaryAddress" class="break-anywhere"></strong></div>
-									<div class="summary-line"><span>Amount</span><strong id="summaryAmount"></strong></div>
-									<div class="summary-line"><span>Fee</span><strong id="summaryFee"></strong></div>
-									<div class="summary-line"><span>Total</span><strong id="summaryTotal"></strong></div>
-								</div>
 								<div id="lastTxBox" class="notice hidden">Last transaction: <a id="lastTxLink" class="break-anywhere" href="#" target="_blank" rel="noopener"></a></div>
 							</div>
 
@@ -398,7 +404,7 @@
 												<input id="savePasswordConfirm" type="password" autocomplete="new-password">
 											</div>
 											<button id="saveVaultButton" class="button" type="submit">
-												<i data-lucide="database-lock"></i>
+												<i data-lucide="save"></i>
 												Save Private Key on This Device
 											</button>
 										</form>
@@ -593,7 +599,12 @@
 		<div id="confirmModal" class="modal" role="dialog" aria-modal="true" aria-label="Confirm transaction">
 			<div class="modal-card">
 				<h2>Confirm Send</h2>
-				<div class="notice warning">Only broadcast after you have checked the recipient, amount, and fee.</div>
+				<div id="sendSummary" class="send-summary" aria-live="polite">
+					<div class="summary-line"><span>To</span><strong id="summaryAddress" class="break-anywhere"></strong></div>
+					<div class="summary-line"><span>Amount</span><strong id="summaryAmount"></strong></div>
+					<div class="summary-line"><span>Fee</span><strong id="summaryFee"></strong></div>
+					<div class="summary-line"><span>Total</span><strong id="summaryTotal"></strong></div>
+				</div>
 				<div class="modal-actions">
 					<button id="cancelSend" class="button secondary" type="button">Cancel</button>
 					<button id="confirmSend" class="button" type="button">SEND</button>
@@ -716,17 +727,6 @@
 						<input id="disconnectPassword" type="password" autocomplete="current-password" placeholder="Enter wallet password">
 					</div>
 					<div id="disconnectFeedback" class="notice danger hidden">Incorrect password.</div>
-				</div>
-				<div id="disconnectSaveStep" class="disconnect-step hidden">
-					<div class="notice warning">This wallet is only open for this session. Save it with a password, then copy the private key before disconnecting.</div>
-					<div class="form-row">
-						<label for="disconnectSavePassword">New wallet password</label>
-						<input id="disconnectSavePassword" type="password" autocomplete="new-password" placeholder="At least 10 characters">
-					</div>
-					<div class="form-row">
-						<label for="disconnectSavePasswordConfirm">Confirm wallet password</label>
-						<input id="disconnectSavePasswordConfirm" type="password" autocomplete="new-password">
-					</div>
 				</div>
 				<div id="disconnectWatchStep" class="disconnect-step hidden">
 					<div class="notice">This is a watch-only wallet. Disconnecting closes it on this screen and does not affect the blockchain.</div>
