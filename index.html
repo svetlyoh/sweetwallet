@@ -278,12 +278,6 @@
 										Review Send
 									</button>
 								</form>
-								<div id="sendSummary" class="send-summary">
-									<div class="summary-line"><span>To</span><strong id="summaryAddress" class="break-anywhere"></strong></div>
-									<div class="summary-line"><span>Amount</span><strong id="summaryAmount"></strong></div>
-									<div class="summary-line"><span>Fee</span><strong id="summaryFee"></strong></div>
-									<div class="summary-line"><span>Total</span><strong id="summaryTotal"></strong></div>
-								</div>
 								<div id="lastTxBox" class="notice hidden">Last transaction: <a id="lastTxLink" class="break-anywhere" href="#" target="_blank" rel="noopener"></a></div>
 							</div>
 
@@ -605,7 +599,12 @@
 		<div id="confirmModal" class="modal" role="dialog" aria-modal="true" aria-label="Confirm transaction">
 			<div class="modal-card">
 				<h2>Confirm Send</h2>
-				<div class="notice warning">Only broadcast after you have checked the recipient, amount, and fee.</div>
+				<div id="sendSummary" class="send-summary" aria-live="polite">
+					<div class="summary-line"><span>To</span><strong id="summaryAddress" class="break-anywhere"></strong></div>
+					<div class="summary-line"><span>Amount</span><strong id="summaryAmount"></strong></div>
+					<div class="summary-line"><span>Fee</span><strong id="summaryFee"></strong></div>
+					<div class="summary-line"><span>Total</span><strong id="summaryTotal"></strong></div>
+				</div>
 				<div class="modal-actions">
 					<button id="cancelSend" class="button secondary" type="button">Cancel</button>
 					<button id="confirmSend" class="button" type="button">SEND</button>

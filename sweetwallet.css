@@ -1596,6 +1596,40 @@ select:focus {
 	color: #ffe8e6;
 }
 
+.modal-card .send-summary {
+	margin-top: 14px;
+	border-color: rgba(132, 217, 150, 0.18);
+	background: rgba(1, 63, 39, 0.42);
+}
+
+.modal-card .summary-line {
+	align-items: flex-start;
+	margin: 0;
+	padding: 10px 0;
+	border-bottom: 1px solid rgba(132, 217, 150, 0.13);
+	color: rgba(237, 255, 243, 0.68);
+}
+
+.modal-card .summary-line:first-child {
+	padding-top: 0;
+}
+
+.modal-card .summary-line:last-child {
+	padding-bottom: 0;
+	border-bottom: 0;
+}
+
+.modal-card .summary-line strong {
+	max-width: 76%;
+	color: rgba(255, 255, 255, 0.94);
+}
+
+.modal-card #summaryAddress {
+	font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+	font-size: 0.76rem;
+	line-height: 1.35;
+}
+
 .modal-actions {
 	display: grid;
 	grid-template-columns: 1fr 1fr;
