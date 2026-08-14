@@ -26,6 +26,16 @@
 		<link rel="stylesheet" href="sweetwallet.css">
 	</head>
 	<body>
+		<div class="crypto-field" aria-hidden="true">
+			<span># SHA-256 &nbsp; 6a09e667bb67ae85 &nbsp; 0x3c6ef372a54ff53a &nbsp; nonce: 510e527fade682d1</span>
+			<span>0000000000000000004f3a7c91 &nbsp; #BLOCK &nbsp; merkle: 9b05688c2b3e6c1f &nbsp; 1f83d9abfb41bd6b</span>
+			<span>0x5be0cd19137e2179 &nbsp; #HASHED &nbsp; 428a2f98d728ae22 &nbsp; difficulty: 7137449123ef65cd</span>
+			<span># SUGAR/CHAIN &nbsp; 12835b01d807aa98 &nbsp; 243185be550c7dc3 &nbsp; 72be5d74f27b896f</span>
+			<span>proof: 80deb1fe3b1696b1 &nbsp; #DECENTRALIZED &nbsp; 9bdc06a7c19bf174 &nbsp; e49b69c1efbe4786</span>
+			<span>0x0fc19dc68b8cd5b5 &nbsp; #VERIFY &nbsp; 240ca1cc2de92c6f &nbsp; 4a7484aa5cb0a9dc</span>
+			<span># SELF-CUSTODY &nbsp; 76f988da983e5152 &nbsp; a831c66d2db43210 &nbsp; bf597fc7beef0ee4</span>
+			<span>c6e00bf33da88fc2 &nbsp; #PEER/TO/PEER &nbsp; d5a79147930aa725 &nbsp; 06ca6351e003826f</span>
+		</div>
 		<div class="shell">
 			<header class="app-header">
 				<div class="brand">
@@ -53,7 +63,9 @@
 				<section id="loginScreen" class="screen active">
 					<div class="login-card">
 						<div class="login-title-row">
-							<div>
+							<div class="login-heading">
+								<div class="login-eyebrow"><i data-lucide="shield-check"></i><span>Local &amp; encrypted</span></div>
+								<h2 class="login-title">Welcome back</h2>
 								<p class="login-copy">Unlock a saved wallet, or use a private key for this session.</p>
 							</div>
 							<button id="createWallet" class="new-wallet-button" type="button" aria-label="Create new wallet">
@@ -105,7 +117,7 @@
 								</button>
 							</div>
 						</div>
-						<div class="notice login-helper-note">New wallets stay temporary until you save them in Security.</div>
+						<div class="notice login-helper-note"><i data-lucide="shield"></i><span>New wallets stay temporary until you save them in Security.</span></div>
 					</div>
 				</section>
 
@@ -398,7 +410,7 @@
 												<input id="savePasswordConfirm" type="password" autocomplete="new-password">
 											</div>
 											<button id="saveVaultButton" class="button" type="submit">
-												<i data-lucide="database-lock"></i>
+												<i data-lucide="save"></i>
 												Save Private Key on This Device
 											</button>
 										</form>

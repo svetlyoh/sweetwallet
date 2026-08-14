@@ -2368,11 +2368,13 @@
 	function openMenu() {
 		updateMenuUi();
 		$('#menuSheet').classList.add('active');
+		$('#menuSheet').setAttribute('aria-hidden', 'false');
 		$('#menuToggle').setAttribute('aria-expanded', 'true');
 	}
 
 	function closeMenu() {
 		$('#menuSheet').classList.remove('active');
+		$('#menuSheet').setAttribute('aria-hidden', 'true');
 		$('#menuToggle').setAttribute('aria-expanded', 'false');
 	}
 
