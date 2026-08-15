@@ -197,7 +197,7 @@
 
 	function importPublicKey(value) {
 		var raw = assertLength('X25519 public key', base64UrlToBytes(value), 32);
-		return getCrypto().subtle.importKey('raw', raw, { name: 'X25519' }, false, []);
+		return getCrypto().subtle.importKey('raw', raw, { name: 'X25519' }, true, []);
 	}
 
 	function importPrivateKey(value) {

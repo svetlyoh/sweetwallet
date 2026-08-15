@@ -72,6 +72,86 @@ test('X25519 private identity survives JSON serialization without IndexedDB Cryp
 	restoredContentKey.fill(0);
 });
 
+test('imported X25519 public key remains extractable and can be re-exported', async () => {
+	const identity = await Keylink.generateIdentity();
+	const serialized = await Keylink.exportPublicKey(identity.publicKey);
+	const imported = await Keylink.importPublicKey(serialized);
+	assert.equal(imported.extractable, true);
+	assert.equal(await Keylink.exportPublicKey(imported), serialized);
+});
+
+test('reloaded X25519 identity can unwrap and view an existing secret', async () => {
+	const owner = sugarIdentity(10);
+	let identity = await Keylink.generateIdentity();
+	const storedPublicKey = await Keylink.exportPublicKey(identity.publicKey);
+	const storedPrivateKey = JSON.stringify(await Keylink.exportPrivateKey(identity.privateKey));
+	const encrypted = await Keylink.encryptSecret('Persisted owner can still view this secret.');
+	const envelope = await Keylink.wrapContentKey(
+		encrypted.contentKey,
+		storedPublicKey,
+		encrypted.encryptedSecret.secret_id,
+		owner.address,
+		1
+	);
+
+	identity = null;
+	const reloadedIdentity = {
+		publicKey: await Keylink.importPublicKey(storedPublicKey),
+		privateKey: await Keylink.importPrivateKey(storedPrivateKey)
+	};
+	const restoredContentKey = await Keylink.unwrapContentKey(envelope, reloadedIdentity);
+	assert.equal(
+		await Keylink.decryptSecret(encrypted.encryptedSecret, restoredContentKey),
+		'Persisted owner can still view this secret.'
+	);
+
+	encrypted.contentKey.fill(0);
+	restoredContentKey.fill(0);
+});
+
+test('reloaded owner can rewrap an existing secret for a new owner', async () => {
+	const ownerA = sugarIdentity(11);
+	const ownerB = sugarIdentity(12);
+	let identityA = await Keylink.generateIdentity();
+	const identityB = await Keylink.generateIdentity();
+	const storedPublicA = await Keylink.exportPublicKey(identityA.publicKey);
+	const storedPrivateA = JSON.stringify(await Keylink.exportPrivateKey(identityA.privateKey));
+	const publicB = await Keylink.exportPublicKey(identityB.publicKey);
+	const plaintext = 'Reloaded owner can approve this ownership transfer.';
+	const encrypted = await Keylink.encryptSecret(plaintext);
+	const envelopeA = await Keylink.wrapContentKey(
+		encrypted.contentKey,
+		storedPublicA,
+		encrypted.encryptedSecret.secret_id,
+		ownerA.address,
+		1
+	);
+
+	identityA = null;
+	const reloadedIdentityA = {
+		publicKey: await Keylink.importPublicKey(storedPublicA),
+		privateKey: await Keylink.importPrivateKey(storedPrivateA)
+	};
+	const ownerContentKey = await Keylink.unwrapContentKey(envelopeA, reloadedIdentityA);
+	const plaintextBeforeTransfer = await Keylink.decryptSecret(encrypted.encryptedSecret, ownerContentKey);
+	ownerContentKey.fill(0);
+
+	const envelopeB = await Keylink.rewrapOwnerEnvelope(
+		envelopeA,
+		reloadedIdentityA,
+		publicB,
+		ownerB.address,
+		2
+	);
+	const buyerContentKey = await Keylink.unwrapContentKey(envelopeB, identityB);
+	const plaintextAfterTransfer = await Keylink.decryptSecret(encrypted.encryptedSecret, buyerContentKey);
+	assert.equal(plaintextBeforeTransfer, plaintext);
+	assert.equal(plaintextAfterTransfer, plaintextBeforeTransfer);
+
+	encrypted.contentKey.fill(0);
+	buyerContentKey.fill(0);
+});
+
 test('secret length is capped at 300 characters', async () => {
 	await Keylink.encryptSecret('x'.repeat(300));
 	await assert.rejects(Keylink.encryptSecret('x'.repeat(301)), /at most 300/);
