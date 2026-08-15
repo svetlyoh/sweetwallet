@@ -36,7 +36,7 @@ async function seedLegacyDatabase(indexedDB, ownerId, secretId) {
 	database.close();
 }
 
-test('upgrades legacy inline key paths without losing Keylink data', async () => {
+test('upgrades legacy inline key paths into Safari-safe out-of-line stores', async () => {
 	const indexedDB = new IDBFactory();
 	const ownerId = 'sugar1qlegacyowner';
 	const secretId = 'ab'.repeat(16);
@@ -57,9 +57,18 @@ test('upgrades legacy inline key paths without losing Keylink data', async () =>
 	await storage.putIdentity({
 		owner_id: ownerId,
 		public_key: 'updated-public-key',
-		private_key: 'updated-private-key'
+		private_key_jwk: JSON.stringify({ kty: 'OKP', crv: 'X25519', d: 'private', x: 'public' }),
+		private_key: 'must-not-be-persisted'
 	});
-	assert.equal((await storage.getIdentity(ownerId)).public_key, 'updated-public-key');
+	const updated = await storage.getIdentity(ownerId);
+	assert.equal(updated.public_key, 'updated-public-key');
+	assert.equal(updated.private_key, null);
+	assert.match(updated.private_key_jwk, /"X25519"/);
+
+	const upgraded = await requestResult(indexedDB.open(KeylinkStorage.DB_NAME, KeylinkStorage.DB_VERSION));
+	assert.equal(upgraded.transaction(KeylinkStorage.IDENTITY_STORE).objectStore(KeylinkStorage.IDENTITY_STORE).keyPath, null);
+	assert.equal(upgraded.transaction(KeylinkStorage.SECRET_STORE).objectStore(KeylinkStorage.SECRET_STORE).keyPath, null);
+	upgraded.close();
 	await storage.close();
 });
 

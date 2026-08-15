@@ -11,11 +11,11 @@
 	'use strict';
 
 	var DB_NAME = 'sweetwallet_keylink_v1';
-	var DB_VERSION = 2;
-	var IDENTITY_STORE = 'identities_v2';
-	var SECRET_STORE = 'secrets_v2';
-	var LEGACY_IDENTITY_STORE = 'identities';
-	var LEGACY_SECRET_STORE = 'secrets';
+	var DB_VERSION = 3;
+	var IDENTITY_STORE = 'identities_v3';
+	var SECRET_STORE = 'secrets_v3';
+	var LEGACY_IDENTITY_STORES = ['identities_v2', 'identities'];
+	var LEGACY_SECRET_STORES = ['secrets_v2', 'secrets'];
 
 	function text(value) {
 		return String(value === undefined || value === null ? '' : value).trim();
@@ -29,9 +29,24 @@
 			owner_id: ownerId,
 			public_key: source.public_key || source.publicKey || '',
 			private_key: source.private_key || source.privateKey || null,
+			private_key_jwk: source.private_key_jwk || source.privateKeyJwk || '',
 			created_at: source.created_at || source.createdAt || new Date().toISOString(),
 			updated_at: source.updated_at || source.updatedAt || new Date().toISOString()
 		});
+	}
+
+	function serializedIdentity(record, primaryKey) {
+		var normalized = normalizeIdentity(record, primaryKey);
+		if (!normalized || !normalized.public_key || !normalized.private_key_jwk) { return null; }
+		var persisted = Object.assign({}, normalized, {
+			private_key_jwk: typeof normalized.private_key_jwk === 'string' ?
+				normalized.private_key_jwk : JSON.stringify(normalized.private_key_jwk)
+		});
+		delete persisted.private_key;
+		delete persisted.privateKey;
+		delete persisted.publicKey;
+		delete persisted.privateKeyJwk;
+		return persisted;
 	}
 
 	function normalizeSecret(record, primaryKey, ownerId) {
@@ -50,14 +65,15 @@
 		});
 	}
 
-	function migrateStore(transaction, sourceName, targetStore, normalize) {
+	function migrateStore(transaction, sourceName, targetStore, normalize, keyForRecord) {
 		if (!transaction.db.objectStoreNames.contains(sourceName)) { return; }
 		var cursorRequest = transaction.objectStore(sourceName).openCursor();
 		cursorRequest.onsuccess = function () {
 			var cursor = cursorRequest.result;
 			if (!cursor) { return; }
 			var normalized = normalize(cursor.value, cursor.primaryKey);
-			if (normalized) { targetStore.put(normalized); }
+			var key = normalized && keyForRecord(normalized);
+			if (normalized && key) { targetStore.put(normalized, key); }
 			cursor.continue();
 		};
 	}
@@ -75,19 +91,17 @@
 					var transaction = request.transaction;
 					var identityStore = database.objectStoreNames.contains(IDENTITY_STORE) ?
 						transaction.objectStore(IDENTITY_STORE) :
-						database.createObjectStore(IDENTITY_STORE, { keyPath: 'owner_id' });
-					var secretStore;
-					if (database.objectStoreNames.contains(SECRET_STORE)) {
-						secretStore = transaction.objectStore(SECRET_STORE);
-					} else {
-						secretStore = database.createObjectStore(SECRET_STORE, { keyPath: 'local_id' });
-						secretStore.createIndex('owner_id', 'owner_id', { unique: false });
-						secretStore.createIndex('secret_id', 'secret_id', { unique: false });
-						secretStore.createIndex('updated_at', 'updated_at', { unique: false });
-					}
-					migrateStore(transaction, LEGACY_IDENTITY_STORE, identityStore, normalizeIdentity);
-					migrateStore(transaction, LEGACY_SECRET_STORE, secretStore, function (record, primaryKey) {
-						return normalizeSecret(record, primaryKey);
+						database.createObjectStore(IDENTITY_STORE);
+					var secretStore = database.objectStoreNames.contains(SECRET_STORE) ?
+						transaction.objectStore(SECRET_STORE) :
+						database.createObjectStore(SECRET_STORE);
+					LEGACY_IDENTITY_STORES.forEach(function (storeName) {
+						migrateStore(transaction, storeName, identityStore, serializedIdentity, function (record) { return record.owner_id; });
+					});
+					LEGACY_SECRET_STORES.forEach(function (storeName) {
+						migrateStore(transaction, storeName, secretStore, function (record, primaryKey) {
+							return normalizeSecret(record, primaryKey);
+						}, function (record) { return record.local_id; });
 					});
 				};
 				request.onsuccess = function () { resolve(request.result); };
@@ -127,28 +141,57 @@
 			});
 		}
 
+		function optionalGet(storeName, key) {
+			return openDatabase().then(function (database) {
+				if (!database.objectStoreNames.contains(storeName)) {
+					database.close();
+					return null;
+				}
+				return new Promise(function (resolve, reject) {
+					var transaction = database.transaction(storeName, 'readonly');
+					var request = transaction.objectStore(storeName).get(key);
+					var result = null;
+					request.onsuccess = function () { result = request.result || null; };
+					request.onerror = function () { reject(request.error || new Error('Legacy Keylink identity could not be read.')); };
+					transaction.oncomplete = function () { database.close(); resolve(result); };
+					transaction.onabort = transaction.onerror = function () {
+						database.close();
+						reject(transaction.error || new Error('Legacy Keylink identity transaction failed.'));
+					};
+				});
+			});
+		}
+
+		function getLegacyIdentity(ownerId, index) {
+			if (index >= LEGACY_IDENTITY_STORES.length) { return Promise.resolve(null); }
+			return optionalGet(LEGACY_IDENTITY_STORES[index], ownerId).then(function (record) {
+				return record ? normalizeIdentity(record, ownerId) : getLegacyIdentity(ownerId, index + 1);
+			});
+		}
+
 		return {
 			getIdentity: function (ownerId) {
 				return dbRequest(IDENTITY_STORE, 'readonly', function (store) { return store.get(ownerId); })
-					.then(function (record) { return record ? normalizeIdentity(record, ownerId) : null; });
+					.then(function (record) { return record ? normalizeIdentity(record, ownerId) : getLegacyIdentity(ownerId, 0); });
 			},
 			putIdentity: function (record) {
-				var normalized = normalizeIdentity(record);
-				if (!normalized || !normalized.public_key || !normalized.private_key) {
-					return Promise.reject(new Error('Keylink encryption identity is incomplete.'));
+				var persisted = serializedIdentity(record);
+				if (!persisted) {
+					return Promise.reject(new Error('Keylink encryption identity is not serialized for Safari-safe storage.'));
 				}
-				return dbRequest(IDENTITY_STORE, 'readwrite', function (store) { return store.put(normalized); });
+				return dbRequest(IDENTITY_STORE, 'readwrite', function (store) { return store.put(persisted, persisted.owner_id); });
 			},
 			getOwnerRecords: function (ownerId) {
-				return dbRequest(SECRET_STORE, 'readonly', function (store) { return store.index('owner_id').getAll(ownerId); })
+				return dbRequest(SECRET_STORE, 'readonly', function (store) { return store.getAll(); })
 					.then(function (records) {
-						return records.map(function (record) { return normalizeSecret(record, record.local_id, ownerId); }).filter(Boolean);
+						return records.map(function (record) { return normalizeSecret(record, record.local_id, ownerId); })
+							.filter(function (record) { return record && record.owner_id === ownerId; });
 					});
 			},
 			putRecord: function (ownerId, record) {
 				var normalized = normalizeSecret(record, null, ownerId);
 				if (!normalized) { return Promise.reject(new Error('Keylink record is missing its local storage key.')); }
-				return dbRequest(SECRET_STORE, 'readwrite', function (store) { return store.put(normalized); });
+				return dbRequest(SECRET_STORE, 'readwrite', function (store) { return store.put(normalized, normalized.local_id); });
 			},
 			close: function () {
 				return openDatabase().then(function (database) { database.close(); });
@@ -159,8 +202,11 @@
 	return {
 		DB_NAME: DB_NAME,
 		DB_VERSION: DB_VERSION,
+		IDENTITY_STORE: IDENTITY_STORE,
+		SECRET_STORE: SECRET_STORE,
 		createStorage: createStorage,
 		normalizeIdentity: normalizeIdentity,
+		serializedIdentity: serializedIdentity,
 		normalizeSecret: normalizeSecret
 	};
 }));

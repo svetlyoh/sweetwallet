@@ -191,9 +191,21 @@
 		});
 	}
 
+	function exportPrivateKey(privateKey) {
+		return getCrypto().subtle.exportKey('jwk', privateKey);
+	}
+
 	function importPublicKey(value) {
 		var raw = assertLength('X25519 public key', base64UrlToBytes(value), 32);
 		return getCrypto().subtle.importKey('raw', raw, { name: 'X25519' }, false, []);
+	}
+
+	function importPrivateKey(value) {
+		var jwk = typeof value === 'string' ? JSON.parse(value) : value;
+		if (!jwk || jwk.kty !== 'OKP' || jwk.crv !== 'X25519' || !jwk.d) {
+			return Promise.reject(new Error('Keylink private encryption key is invalid.'));
+		}
+		return getCrypto().subtle.importKey('jwk', jwk, { name: 'X25519' }, true, ['deriveBits']);
 	}
 
 	function envelopeAad(secretId, ownerId, version, recipientHash) {
@@ -429,7 +441,9 @@
 		parseSecretUri: parseSecretUri,
 		generateIdentity: generateIdentity,
 		exportPublicKey: exportPublicKey,
+		exportPrivateKey: exportPrivateKey,
 		importPublicKey: importPublicKey,
+		importPrivateKey: importPrivateKey,
 		encryptSecret: encryptSecret,
 		decryptSecret: decryptSecret,
 		wrapContentKey: wrapContentKey,

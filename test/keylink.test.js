@@ -58,6 +58,20 @@ test('secret stays encrypted while its content key moves between X25519 owners',
 	secondKey.fill(0);
 });
 
+test('X25519 private identity survives JSON serialization without IndexedDB CryptoKey cloning', async () => {
+	const identity = await Keylink.generateIdentity();
+	const serialized = JSON.stringify(await Keylink.exportPrivateKey(identity.privateKey));
+	const restoredPrivate = await Keylink.importPrivateKey(serialized);
+	const owner = sugarIdentity(9);
+	const encrypted = await Keylink.encryptSecret('Safari-safe identity');
+	const publicKey = await Keylink.exportPublicKey(identity.publicKey);
+	const envelope = await Keylink.wrapContentKey(encrypted.contentKey, publicKey, encrypted.encryptedSecret.secret_id, owner.address, 1);
+	const restoredContentKey = await Keylink.unwrapContentKey(envelope, { privateKey: restoredPrivate, publicKey: identity.publicKey });
+	assert.equal(await Keylink.decryptSecret(encrypted.encryptedSecret, restoredContentKey), 'Safari-safe identity');
+	encrypted.contentKey.fill(0);
+	restoredContentKey.fill(0);
+});
+
 test('secret length is capped at 300 characters', async () => {
 	await Keylink.encryptSecret('x'.repeat(300));
 	await assert.rejects(Keylink.encryptSecret('x'.repeat(301)), /at most 300/);

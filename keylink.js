@@ -103,10 +103,23 @@
 	}
 
 	async function loadIdentityPair(record) {
+		var privateKey = record.private_key_jwk ?
+			await Crypto.importPrivateKey(record.private_key_jwk) :
+			(record.private_key || record.privateKey);
+		if (!privateKey) { throw new Error('The stored Keylink encryption identity is incomplete.'); }
 		return {
-			privateKey: record.private_key,
+			privateKey: privateKey,
 			publicKey: await Crypto.importPublicKey(record.public_key)
 		};
+	}
+
+	async function serializedIdentityRecord(ownerId, pair, metadata) {
+		return Object.assign({}, metadata || {}, {
+			owner_id: ownerId,
+			public_key: await Crypto.exportPublicKey(pair.publicKey),
+			private_key_jwk: JSON.stringify(await Crypto.exportPrivateKey(pair.privateKey)),
+			updated_at: new Date().toISOString()
+		});
 	}
 
 	async function ensureIdentity() {
@@ -120,29 +133,32 @@
 			var ownerHash = await Crypto.sha256Hex(context.address);
 			var legacy = await legacyIdentity(ownerHash);
 			if (legacy && legacy.privateKey && legacy.publicKey) {
-				state.identityRecord = {
-					owner_id: context.address,
-					public_key: legacy.publicKey,
-					private_key: legacy.privateKey,
-					created_at: legacy.createdAt || new Date().toISOString(),
-					updated_at: new Date().toISOString(),
-					migrated_from: 'File Key Relay'
+				state.identityPair = {
+					privateKey: legacy.privateKey,
+					publicKey: await Crypto.importPublicKey(legacy.publicKey)
 				};
+				state.identityRecord = await serializedIdentityRecord(context.address, state.identityPair, {
+					created_at: legacy.createdAt || new Date().toISOString(),
+					migrated_from: 'File Key Relay'
+				});
 				await putIdentity(state.identityRecord);
 				toast('Your existing X25519 encryption identity was migrated to Keylink.');
 			} else {
 				var pair = await Crypto.generateIdentity();
-				state.identityRecord = {
-					owner_id: context.address,
-					public_key: await Crypto.exportPublicKey(pair.publicKey),
-					private_key: pair.privateKey,
-					created_at: new Date().toISOString(),
-					updated_at: new Date().toISOString()
-				};
+				state.identityPair = pair;
+				state.identityRecord = await serializedIdentityRecord(context.address, pair, {
+					created_at: new Date().toISOString()
+				});
 				await putIdentity(state.identityRecord);
 			}
 		}
-		state.identityPair = await loadIdentityPair(state.identityRecord);
+		if (!state.identityPair) { state.identityPair = await loadIdentityPair(state.identityRecord); }
+		if (!state.identityRecord.private_key_jwk) {
+			state.identityRecord = await serializedIdentityRecord(context.address, state.identityPair, state.identityRecord);
+			delete state.identityRecord.private_key;
+			delete state.identityRecord.privateKey;
+			await putIdentity(state.identityRecord);
+		}
 		return state.identityRecord;
 	}
 
@@ -746,7 +762,7 @@
 			if (!file) { throw new Error('Choose a Keylink identity backup file.'); }
 			var imported = await Crypto.importIdentityBackup(await file.text(), $('#keylinkImportPassword').value);
 			if (imported.ownerId && imported.ownerId !== state.ownerId) { throw new Error('This identity backup belongs to a different Sugarchain wallet.'); }
-			var record = { owner_id: state.ownerId, public_key: await Crypto.exportPublicKey(imported.publicKey), private_key: imported.privateKey, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), imported: true };
+			var record = await serializedIdentityRecord(state.ownerId, imported, { created_at: new Date().toISOString(), imported: true });
 			await putIdentity(record); state.identityRecord = record; state.identityPair = { privateKey: imported.privateKey, publicKey: imported.publicKey };
 			$('#keylinkImportFile').value = ''; $('#keylinkImportPassword').value = '';
 			showIdentity(); toast('Keylink encryption identity restored.');
