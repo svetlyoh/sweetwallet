@@ -3,10 +3,7 @@
 
 	var Crypto = window.SweetWalletKeylinkCrypto;
 	var Bridge = window.SweetWalletKeylinkBridge;
-	var DB_NAME = 'sweetwallet_keylink_v1';
-	var DB_VERSION = 1;
-	var IDENTITY_STORE = 'identities';
-	var SECRET_STORE = 'secrets';
+	var Storage = window.SweetWalletKeylinkStorage;
 	var POLL_INTERVAL = 30000;
 	var state = {
 		ownerId: '',
@@ -72,62 +69,22 @@
 		return state.ownerId + ':' + String(secretId || '').toLowerCase();
 	}
 
-	function openDatabase(name, version, upgrade) {
-		return new Promise(function (resolve, reject) {
-			if (!window.indexedDB) {
-				reject(new Error('This browser cannot store the local Keylink identity.'));
-				return;
-			}
-			var request = window.indexedDB.open(name, version);
-			request.onupgradeneeded = function () { if (upgrade) { upgrade(request.result); } };
-			request.onsuccess = function () { resolve(request.result); };
-			request.onerror = function () { reject(request.error || new Error('Keylink storage could not open.')); };
-		});
-	}
-
-	function openKeylinkDatabase() {
-		return openDatabase(DB_NAME, DB_VERSION, function (database) {
-			if (!database.objectStoreNames.contains(IDENTITY_STORE)) {
-				database.createObjectStore(IDENTITY_STORE, { keyPath: 'owner_id' });
-			}
-			if (!database.objectStoreNames.contains(SECRET_STORE)) {
-				var store = database.createObjectStore(SECRET_STORE, { keyPath: 'local_id' });
-				store.createIndex('owner_id', 'owner_id', { unique: false });
-				store.createIndex('secret_id', 'secret_id', { unique: false });
-				store.createIndex('updated_at', 'updated_at', { unique: false });
-			}
-		});
-	}
-
-	function dbRequest(storeName, mode, operation) {
-		return openKeylinkDatabase().then(function (database) {
-			return new Promise(function (resolve, reject) {
-				var transaction = database.transaction(storeName, mode);
-				var request = operation(transaction.objectStore(storeName));
-				request.onsuccess = function () { resolve(request.result); };
-				request.onerror = function () { reject(request.error || new Error('Keylink storage operation failed.')); };
-				transaction.oncomplete = function () { database.close(); };
-				transaction.onabort = transaction.onerror = function () { database.close(); };
-			});
-		});
-	}
-
 	function getIdentity(ownerId) {
-		return dbRequest(IDENTITY_STORE, 'readonly', function (store) { return store.get(ownerId); });
+		return Storage.getIdentity(ownerId);
 	}
 
 	function putIdentity(record) {
-		return dbRequest(IDENTITY_STORE, 'readwrite', function (store) { return store.put(record); });
+		return Storage.putIdentity(record);
 	}
 
 	function getOwnerRecords(ownerId) {
-		return dbRequest(SECRET_STORE, 'readonly', function (store) { return store.index('owner_id').getAll(ownerId); });
+		return Storage.getOwnerRecords(ownerId);
 	}
 
 	function putRecord(record) {
 		record.local_id = record.local_id || localId(record.secret_id);
 		record.owner_id = state.ownerId;
-		return dbRequest(SECRET_STORE, 'readwrite', function (store) { return store.put(record); });
+		return Storage.putRecord(state.ownerId, record);
 	}
 
 	function legacyIdentity(ownerHash) {
@@ -866,7 +823,7 @@
 	}
 
 	function init() {
-		if (!Crypto || !Bridge || !$('#keylinkPanel')) { return; }
+		if (!Crypto || !Bridge || !Storage || !$('#keylinkPanel')) { return; }
 		wireEvents();
 		refreshIcons();
 	}
