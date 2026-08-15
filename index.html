@@ -24,6 +24,7 @@
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
 		<link rel="stylesheet" href="sweetwallet.css">
+		<link rel="stylesheet" href="file-key-relay.css">
 	</head>
 	<body>
 		<div class="crypto-field" aria-hidden="true">
@@ -279,6 +280,169 @@
 									</button>
 								</form>
 								<div id="lastTxBox" class="notice hidden">Last transaction: <a id="lastTxLink" class="break-anywhere" href="#" target="_blank" rel="noopener"></a></div>
+							</div>
+
+							<div id="fileRelayPanel" class="panel file-relay-panel" data-panel="file-relay">
+								<div class="panel-title-row">
+									<button class="back-button" type="button" data-tab="activity" aria-label="Back to activity">
+										<i data-lucide="arrow-left"></i>
+									</button>
+									<div>
+										<h2>File Key Relay</h2>
+										<p class="relay-kicker">Encrypted key exchange anchored by Sugarchain</p>
+									</div>
+								</div>
+
+								<section data-relay-view="home">
+									<div class="notice">Encrypt a file locally, encrypt its random file key to a recipient's dedicated X25519 public key, and optionally anchor the public capsule proof on Sugarchain.</div>
+									<div class="relay-key-separation">
+										<div><strong>SUGAR Wallet Key</strong><span>Controls funds.</span></div>
+										<div><strong>File Relay Encryption Key</strong><span>Decrypts file keys. Does not spend SUGAR.</span></div>
+									</div>
+									<div id="relayHomeKeyStatus" class="relay-home-status">Checking local encryption key...</div>
+									<div class="relay-action-grid">
+										<button class="relay-action-card" type="button" data-relay-action="setup">
+											<i data-lucide="key-round"></i><span>Set Up My Encryption Key</span>
+										</button>
+										<button class="relay-action-card" type="button" data-relay-action="encrypt">
+											<i data-lucide="file-lock-2"></i><span>Encrypt File for Recipient</span>
+										</button>
+										<button class="relay-action-card" type="button" data-relay-action="decrypt">
+											<i data-lucide="scan-qr-code"></i><span>Scan QR / Decrypt File Key</span>
+										</button>
+										<button class="relay-action-card" type="button" data-relay-action="history">
+											<i data-lucide="history"></i><span>Relay History</span>
+										</button>
+									</div>
+									<div class="notice warning relay-public-warning">The QR may be public. Security comes from authenticated encryption and the recipient's private encryption key—not from hiding the QR.</div>
+								</section>
+
+								<section class="hidden" data-relay-view="setup">
+									<div class="relay-subview-heading">
+										<button class="back-button" type="button" data-relay-home aria-label="Back to File Key Relay"><i data-lucide="arrow-left"></i></button>
+										<h3>Set Up My Encryption Key</h3>
+									</div>
+									<div id="relayKeyStatus" class="notice">Checking browser encryption-key storage...</div>
+									<div class="form-row">
+										<label for="relayKeyLabel">Optional public label</label>
+										<input id="relayKeyLabel" type="text" maxlength="80" placeholder="Example: Svet's phone">
+									</div>
+									<button id="relayGenerateKey" class="button" type="button">
+										<i data-lucide="key-round"></i>Generate Dedicated X25519 Key
+									</button>
+									<div id="relayPublicKeyBox" class="relay-output-card hidden">
+										<div class="relay-section-title"><span>Public encryption key</span><span class="relay-safe-badge">Safe to share</span></div>
+										<div class="field-pair">
+											<input id="relayPublicKey" class="monospace" readonly>
+											<button id="relayCopyPublicKey" class="copy-button" type="button" aria-label="Copy public encryption key"><i data-lucide="copy"></i></button>
+										</div>
+										<div id="relayPublicKeyQr" class="relay-qr"></div>
+										<label for="relayRecipientUri">Recipient QR URI</label>
+										<div class="field-pair">
+											<input id="relayRecipientUri" class="monospace" readonly>
+											<button id="relayCopyRecipientUri" class="copy-button" type="button" aria-label="Copy recipient key URI"><i data-lucide="copy"></i></button>
+										</div>
+										<button id="relaySaveLabel" class="button subtle" type="button"><i data-lucide="save"></i>Save Public Label</button>
+									</div>
+									<div id="relayKeyBackupBox" class="relay-backup-stack hidden">
+										<div class="notice warning">Back up this encryption key. Losing it means old File Relay capsules cannot be decrypted. The backup is encrypted with the password you choose below.</div>
+										<form id="relayExportBackupForm" class="relay-output-card" autocomplete="off">
+											<h4>Export encrypted key backup</h4>
+											<div class="form-row"><label for="relayBackupPassword">Backup password</label><input id="relayBackupPassword" type="password" autocomplete="new-password" placeholder="At least 10 characters"></div>
+											<div class="form-row"><label for="relayBackupPasswordConfirm">Confirm backup password</label><input id="relayBackupPasswordConfirm" type="password" autocomplete="new-password"></div>
+											<button id="relayExportBackupButton" class="button subtle" type="submit"><i data-lucide="download"></i>Download Encrypted Key Backup</button>
+										</form>
+										<form id="relayImportBackupForm" class="relay-output-card" autocomplete="off">
+											<h4>Import encrypted key backup</h4>
+											<div class="form-row"><label for="relayBackupFile">Backup JSON file</label><input id="relayBackupFile" type="file" accept="application/json,.json"></div>
+											<div class="form-row"><label for="relayImportBackupPassword">Backup password</label><input id="relayImportBackupPassword" type="password" autocomplete="current-password"></div>
+											<button id="relayImportBackupButton" class="button subtle" type="submit"><i data-lucide="upload"></i>Import Relay Encryption Key</button>
+										</form>
+									</div>
+								</section>
+
+								<section class="hidden" data-relay-view="encrypt">
+									<div class="relay-subview-heading">
+										<button class="back-button" type="button" data-relay-home aria-label="Back to File Key Relay"><i data-lucide="arrow-left"></i></button>
+										<h3>Encrypt File for Recipient</h3>
+									</div>
+									<form id="relayEncryptForm" autocomplete="off">
+										<div class="form-row"><label for="relayFileInput">Select file</label><input id="relayFileInput" type="file"></div>
+										<div class="form-row">
+											<label for="relayRecipientKey">Recipient public encryption key or recipient QR URI</label>
+											<div class="field-pair relay-textarea-pair">
+												<textarea id="relayRecipientKey" class="monospace" rows="3" spellcheck="false" placeholder="Paste X25519 public key or sugarfilekey://recipient URI"></textarea>
+												<button id="relayScanRecipient" class="copy-button" type="button" aria-label="Scan recipient encryption key QR"><i data-lucide="scan-qr-code"></i></button>
+											</div>
+										</div>
+										<div class="field-grid relay-two-column">
+											<div><label for="relayRecipientLabel">Optional recipient label</label><input id="relayRecipientLabel" type="text" maxlength="80"></div>
+											<div><label for="relayNote">Optional public note</label><input id="relayNote" type="text" maxlength="160"></div>
+										</div>
+										<div class="form-row">
+											<label for="relayMode">Relay mode</label>
+											<select id="relayMode">
+												<option value="sugarchain">Sugarchain anchor (recommended)</option>
+												<option value="offchain">No chain broadcast / QR only</option>
+											</select>
+										</div>
+										<div class="notice">Sugarchain mode uses an estimated <strong id="relayFeeAmount">0.00001 SUGAR</strong> fee. QR-only mode encrypts securely but creates no public timestamp proof.</div>
+										<button id="relayEncryptButton" class="button" type="submit"><i data-lucide="file-lock-2"></i>Encrypt File Locally</button>
+									</form>
+									<div id="relayEncryptStatus" class="notice">Select a file and the recipient's public encryption key. Nothing is uploaded.</div>
+									<div id="relayEncryptOutput" class="relay-output-card hidden">
+										<h4>Encrypted file ready</h4>
+										<div class="relay-hash-line"><span>Encrypted file hash</span><code id="relayEncryptedHash"></code></div>
+										<div class="relay-hash-line"><span>Manifest hash</span><code id="relayManifestHash"></code></div>
+										<button id="relayDownloadEncrypted" class="button" type="button"><i data-lucide="download"></i>Download Encrypted .sugarfile</button>
+										<div id="relayChainActions">
+											<button id="relayReviewAnchor" class="button relay-anchor-button" type="button"><i data-lucide="radio"></i>Review &amp; Broadcast SGF1 Anchor</button>
+										</div>
+									</div>
+									<div id="relayCapsuleOutput" class="relay-output-card hidden">
+										<h4>Recipient capsule QR</h4>
+										<div id="relayQrStatus" class="notice"></div>
+										<div id="relayCapsuleQr" class="relay-qr relay-capsule-qr"></div>
+										<label for="relayCapsuleUri">Encrypted capsule URI</label>
+										<textarea id="relayCapsuleUri" class="monospace" rows="4" readonly spellcheck="false"></textarea>
+										<div class="relay-capsule-actions">
+											<button id="relayCopyCapsule" class="button subtle" type="button"><i data-lucide="copy"></i>Copy Capsule</button>
+											<button id="relayDownloadJson" class="button subtle" type="button"><i data-lucide="download"></i>Download Relay JSON</button>
+										</div>
+										<div class="relay-tx-row"><span id="relayCapsuleTxid" class="break-anywhere"></span><button id="relayCopyTxid" class="copy-button" type="button" aria-label="Copy relay transaction ID"><i data-lucide="copy"></i></button></div>
+										<a id="relayCapsuleTxLink" class="button subtle hidden" href="#" target="_blank" rel="noopener"><i data-lucide="external-link"></i>View Anchor in Explorer</a>
+									</div>
+								</section>
+
+								<section class="hidden" data-relay-view="decrypt">
+									<div class="relay-subview-heading">
+										<button class="back-button" type="button" data-relay-home aria-label="Back to File Key Relay"><i data-lucide="arrow-left"></i></button>
+										<h3>Scan QR / Decrypt File Key</h3>
+									</div>
+									<div class="relay-inline-actions">
+										<button id="relayScanCapsule" class="button" type="button"><i data-lucide="scan-qr-code"></i>Scan Capsule QR</button>
+										<label class="button subtle relay-file-button" for="relayImportJsonFile"><i data-lucide="file-json"></i>Import Relay JSON</label>
+										<input id="relayImportJsonFile" class="visually-hidden" type="file" accept="application/json,.json">
+									</div>
+									<div class="form-row"><label for="relayCapsuleInput">Relay URI, base64url payload, or JSON</label><textarea id="relayCapsuleInput" class="monospace" rows="5" spellcheck="false" placeholder="Paste sugarfilekey://open URI or Relay JSON"></textarea></div>
+									<button id="relayOpenCapsule" class="button" type="button"><i data-lucide="key-round"></i>Validate &amp; Decrypt File Key</button>
+									<div id="relayDecryptStatus" class="notice">The raw file key is never displayed. It remains in memory only long enough to decrypt the selected file.</div>
+									<div id="relayAnchorVerification" class="notice hidden"></div>
+									<div id="relayDecryptFileBox" class="relay-output-card hidden">
+										<div class="form-row"><label for="relayEncryptedFileInput">Select matching encrypted .sugarfile</label><input id="relayEncryptedFileInput" type="file" accept=".sugarfile,application/octet-stream"></div>
+										<button id="relayDecryptFileButton" class="button" type="button"><i data-lucide="file-check-2"></i>Decrypt &amp; Download File</button>
+									</div>
+									<button id="relaySwitchBackend" class="button subtle" type="button"><i data-lucide="server"></i>Switch API Backend</button>
+								</section>
+
+								<section class="hidden" data-relay-view="history">
+									<div class="relay-subview-heading">
+										<button class="back-button" type="button" data-relay-home aria-label="Back to File Key Relay"><i data-lucide="arrow-left"></i></button>
+										<h3>Relay History</h3>
+									</div>
+									<div class="notice">History stores public relay metadata only. It never stores plaintext file keys, private encryption keys, or decrypted files.</div>
+									<div id="relayHistoryList" class="relay-history-list"></div>
+								</section>
 							</div>
 
 							<div class="panel" data-panel="keys">
@@ -580,18 +744,21 @@
 					</button>
 				</div>
 				<div class="menu-items">
-					<button class="menu-item" type="button" data-tab="activity"><i data-lucide="list"></i>Activity</button>
+					<button class="menu-item" type="button" data-tab="receive"><i data-lucide="qr-code"></i>Receive</button>
+					<button class="menu-item" type="button" data-tab="send"><i data-lucide="send"></i>Send</button>
+					<button class="menu-item" type="button" data-tab="file-relay"><i data-lucide="file-key-2"></i>File Key Relay</button>
 					<button id="menuLockButton" class="menu-item" type="button"><i data-lucide="lock"></i>Lock</button>
 					<button class="menu-item" type="button" data-tab="keys"><i data-lucide="key-round"></i>Keys</button>
 					<button class="menu-item" type="button" data-tab="broadcast"><i data-lucide="radio"></i>Broadcast</button>
 					<button class="menu-item" type="button" data-tab="settings"><i data-lucide="settings"></i>Settings</button>
+					<button class="menu-item" type="button" data-tab="activity"><i data-lucide="history"></i>Explorer History</button>
 					<button id="menuSetupPinButton" class="menu-item menu-pin-setup" type="button">
 						<i data-lucide="shield-plus"></i>
 						<span>Manage PIN</span>
 						<i class="menu-pin-sparkle" data-lucide="sparkles"></i>
 					</button>
 					<button class="menu-item" type="button" data-tab="security"><i data-lucide="shield-check"></i>Security</button>
-					<button id="logoutButton" class="menu-item" type="button"><i data-lucide="unlink"></i>Disconnect Wallet</button>
+					<button id="logoutButton" class="menu-item" type="button"><i data-lucide="unlink"></i>Logout / Disconnect Wallet</button>
 				</div>
 			</div>
 		</div>
@@ -612,9 +779,25 @@
 			</div>
 		</div>
 
+		<div id="relayAnchorConfirmModal" class="modal" role="dialog" aria-modal="true" aria-label="Confirm File Relay anchor transaction">
+			<div class="modal-card relay-confirm-card">
+				<h2>Confirm SGF1 Anchor</h2>
+				<div class="notice warning">This transaction sends no SUGAR to another person. It publishes one zero-value OP_RETURN record and spends only the network fee.</div>
+				<div class="send-summary active">
+					<div class="summary-line"><span>Network fee</span><strong id="relayConfirmFee"></strong></div>
+					<div class="summary-line"><span>Change returns to</span><strong id="relayConfirmChangeAddress" class="break-anywhere"></strong></div>
+					<div class="summary-line relay-confirm-anchor-line"><span>Public SGF1 header</span><strong id="relayConfirmAnchor" class="break-anywhere"></strong></div>
+				</div>
+				<div class="modal-actions">
+					<button id="relayCancelBroadcast" class="button secondary" type="button">Cancel</button>
+					<button id="relayConfirmBroadcast" class="button" type="button">SIGN &amp; BROADCAST</button>
+				</div>
+			</div>
+		</div>
+
 		<div id="qrScannerModal" class="modal qr-scanner-modal" role="dialog" aria-modal="true" aria-label="Scan recipient QR code">
 			<div class="modal-card qr-scanner-card">
-				<h2>Scan Recipient QR</h2>
+				<h2 id="qrScannerTitle">Scan Recipient QR</h2>
 				<div class="qr-video-frame">
 					<video id="qrScannerVideo" autoplay muted playsinline></video>
 					<div class="qr-scan-frame" aria-hidden="true"></div>
@@ -761,5 +944,7 @@
 		<script src="lib/bitcoinjs-4.0.3-browser.js"></script>
 		<script src="wallet-vault.js"></script>
 		<script src="sweetwallet.js"></script>
+		<script src="file-key-relay-crypto.js"></script>
+		<script src="file-key-relay.js"></script>
 	</body>
 </html>

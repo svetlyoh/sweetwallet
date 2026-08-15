@@ -73,7 +73,8 @@
 			stream: null,
 			frame: 0,
 			detecting: false,
-			lastInvalid: ''
+			lastInvalid: '',
+			purpose: 'payment'
 		},
 		pinSetup: {
 			isSetUp: false,
@@ -620,6 +621,45 @@
 		return true;
 	}
 
+	function handleQrScannerPayload(raw) {
+		var purpose = state.qrScanner.purpose || 'payment';
+		if (purpose === 'relay-recipient' && window.SweetWalletFileRelay) {
+			if (window.SweetWalletFileRelay.handleScannedRecipient(raw)) {
+				stopQrScanner();
+				return true;
+			}
+			return false;
+		}
+		if (purpose === 'relay-capsule' && window.SweetWalletFileRelay) {
+			if (window.SweetWalletFileRelay.handleScannedCapsule(raw)) {
+				stopQrScanner();
+				return true;
+			}
+			return false;
+		}
+		return fillRecipientFromQr(raw);
+	}
+
+	function qrScannerPrompt() {
+		if (state.qrScanner.purpose === 'relay-recipient') {
+			return 'Point your camera at a File Relay recipient public-key QR.';
+		}
+		if (state.qrScanner.purpose === 'relay-capsule') {
+			return 'Point your camera at a sugarfilekey relay capsule QR.';
+		}
+		return 'Point your camera at a Sugarchain receive QR.';
+	}
+
+	function qrScannerInvalidMessage() {
+		if (state.qrScanner.purpose === 'relay-recipient') {
+			return 'QR found, but it is not a supported File Relay recipient key.';
+		}
+		if (state.qrScanner.purpose === 'relay-capsule') {
+			return 'QR found, but it is not a supported File Relay capsule.';
+		}
+		return 'QR found, but it is not a Sugarchain receive address.';
+	}
+
 	function decodeQrFromCanvas(canvas, imageData) {
 		if (window.jsQR) {
 			var result = window.jsQR(imageData.data, imageData.width, imageData.height, {
@@ -660,9 +700,9 @@
 				if (!state.qrScanner.active || !text) {
 					return;
 				}
-				if (!fillRecipientFromQr(text) && text !== state.qrScanner.lastInvalid) {
+				if (!handleQrScannerPayload(text) && text !== state.qrScanner.lastInvalid) {
 					state.qrScanner.lastInvalid = text;
-					setQrScannerStatus('QR found, but it is not a Sugarchain receive address.', 'warning');
+					setQrScannerStatus(qrScannerInvalidMessage(), 'warning');
 				}
 			}).catch(function () {
 				setQrScannerStatus('Could not read that QR. Try better light or move closer.', 'warning');
@@ -677,7 +717,7 @@
 		state.qrScanner.frame = window.requestAnimationFrame(scanQrFrame);
 	}
 
-	function openQrScanner() {
+	function openQrScanner(purpose) {
 		if (!window.isSecureContext) {
 			showToast('Camera scanning requires HTTPS or localhost.', 'danger');
 			return;
@@ -686,9 +726,14 @@
 			showToast('QR camera scanning is not available in this browser.', 'danger');
 			return;
 		}
+		state.qrScanner.purpose = typeof purpose === 'string' ? purpose : 'payment';
 		state.qrScanner.active = true;
 		state.qrScanner.lastInvalid = '';
-		setQrScannerStatus('Point your camera at a Sugarchain receive QR.');
+		if ($('#qrScannerTitle')) {
+			$('#qrScannerTitle').textContent = state.qrScanner.purpose === 'relay-recipient' ? 'Scan Recipient Encryption Key' :
+				(state.qrScanner.purpose === 'relay-capsule' ? 'Scan File Relay Capsule' : 'Scan Recipient QR');
+		}
+		setQrScannerStatus(qrScannerPrompt());
 		$('#qrScannerModal').classList.add('active');
 		navigator.mediaDevices.getUserMedia({
 			video: {
@@ -737,6 +782,7 @@
 		if ($('#qrScannerModal')) {
 			$('#qrScannerModal').classList.remove('active');
 		}
+		state.qrScanner.purpose = 'payment';
 	}
 
 	function createKeys() {
@@ -1024,6 +1070,10 @@
 			button.disabled = isLocked;
 			button.title = isLocked ? 'Unlock the wallet before sending.' : (!canSign && isWatch ? 'Open this wallet with its private key before sending.' : '');
 		});
+		$$('[data-tab="file-relay"]').forEach(function (button) {
+			button.disabled = !canSign;
+			button.title = canSign ? '' : 'Open and unlock a SUGAR wallet before using File Key Relay.';
+		});
 		if ($('#savedWalletInfo')) {
 			$('#savedWalletInfo').classList.toggle('hidden', !state.savedVault);
 		}
@@ -1059,6 +1109,11 @@
 			button.disabled = isLocked;
 			button.title = isLocked ? 'Unlock the wallet to use this menu item.' : '';
 		});
+		var relayButton = $('#menuSheet .menu-item[data-tab="file-relay"]');
+		if (relayButton) {
+			relayButton.disabled = !state.keys;
+			relayButton.title = state.keys ? '' : 'Open and unlock a SUGAR wallet before using File Key Relay.';
+		}
 		if ($('#menuLockButton')) {
 			var canLock = !!state.keys && !!state.savedVault && state.mode === 'saved';
 			$('#menuLockButton').disabled = !canLock;
@@ -1443,6 +1498,7 @@
 		}
 		$('#backupWif').value = '';
 		$('#backupBox').classList.add('hidden');
+		window.dispatchEvent(new CustomEvent('sweetwallet:sensitive-cleared'));
 	}
 
 	function resetAutoLockTimer() {
@@ -2108,7 +2164,11 @@
 		var txb = new bitcoin.TransactionBuilder(SUGAR_NETWORK);
 		txb.setVersion(2);
 		outputs.forEach(function (output) {
-			txb.addOutput(output.address, output.amount);
+			if (output.script) {
+				txb.addOutput(output.script, output.amount);
+			} else {
+				txb.addOutput(output.address, output.amount);
+			}
 		});
 		selection.utxos.forEach(function (utxo) {
 			if (utxo.type === 'bech32') {
@@ -2201,6 +2261,79 @@
 				'content-type': 'application/x-www-form-urlencoded;charset=UTF-8'
 			},
 			body: form.toString()
+		});
+	}
+
+	function extractBroadcastTxid(data, localTxid) {
+		if (data && data.error) {
+			throw new Error(data.error.message || data.error || 'Broadcast rejected.');
+		}
+		var candidate = data && (data.txid || data.result && data.result.txid || data.result);
+		if (typeof candidate === 'string' && /^[0-9a-f]{64}$/i.test(candidate.trim())) {
+			return candidate.trim().toLowerCase();
+		}
+		if (data && (data.accepted === true || data.result === true || data.status === 'accepted')) {
+			return localTxid;
+		}
+		throw new Error('The backend did not return a txid or accepted transaction response.');
+	}
+
+	function broadcastFileRelayAnchor(anchorText) {
+		var header = String(anchorText || '');
+		var fee = amountToSatoshis(state.fee);
+		var transaction;
+		var raw;
+		var localTxid;
+		if (!state.keys || !state.address) {
+			return Promise.reject(new Error('Open and unlock a SUGAR wallet before broadcasting a relay anchor.'));
+		}
+		if (!/^SGF1\|[0-9a-f]{16}\|[0-9a-f]{32}\|[0-9a-f]{16}$/i.test(header)) {
+			return Promise.reject(new Error('The SGF1 OP_RETURN header is invalid.'));
+		}
+		if (new TextEncoder().encode(header).length > 80) {
+			return Promise.reject(new Error('The SGF1 OP_RETURN header exceeds 80 bytes.'));
+		}
+		if (!Number.isFinite(fee) || fee < amountToSatoshis(CONFIG.fee)) {
+			return Promise.reject(new Error('The configured relay fee is invalid.'));
+		}
+		if (state.broadcasting) {
+			return Promise.reject(new Error('Another transaction is already being broadcast.'));
+		}
+		state.broadcasting = true;
+		return reauthenticateForSend().then(function () {
+			return selectUtxos(fee + 1);
+		}).then(function (selection) {
+			selection.change = selection.inputTotal - fee;
+			if (selection.change <= 0) {
+				throw new Error('Insufficient SUGAR to pay the relay fee and create a change output.');
+			}
+			var opReturnScript = bitcoin.script.compile([
+				bitcoin.opcodes.OP_RETURN,
+				bitcoin.Buffer(header, 'utf8')
+			]);
+			var builder = createTransactionBuilder([{
+				script: opReturnScript,
+				amount: 0
+			}], selection, true);
+			transaction = builder.build();
+			raw = transaction.toHex();
+			localTxid = transaction.getId();
+			return broadcastRaw(raw);
+		}).then(function (data) {
+			var txid = extractBroadcastTxid(data, localTxid);
+			refreshBalance(false);
+			return {
+				txid: txid,
+				rawTransaction: raw
+			};
+		}).catch(function (error) {
+			var message = error && error.message || 'File Relay anchor broadcast failed.';
+			if (/Not enough spendable SUGAR/i.test(message)) {
+				message = 'Insufficient SUGAR or no spendable UTXO is available for the relay fee.';
+			}
+			throw new Error(message);
+		}).finally(function () {
+			state.broadcasting = false;
 		});
 	}
 
@@ -2353,6 +2486,10 @@
 			showToast('Unlock the wallet before sending.', 'danger');
 			name = 'locked';
 		}
+		if (name === 'file-relay' && !state.keys) {
+			showToast('Open and unlock a SUGAR wallet before using File Key Relay.', 'danger');
+			name = state.mode === 'locked' ? 'locked' : 'activity';
+		}
 		$$('.panel').forEach(function (panel) {
 			panel.classList.toggle('active', panel.dataset.panel === name);
 		});
@@ -2362,6 +2499,9 @@
 		}
 		if (name === 'security') {
 			renderSecurityUi();
+		}
+		if (name === 'file-relay' && window.SweetWalletFileRelay) {
+			window.SweetWalletFileRelay.onPanelOpen();
 		}
 	}
 
@@ -3587,6 +3727,38 @@
 			window.lucide.createIcons();
 		}
 	}
+
+	window.SweetWalletFileRelayBridge = {
+		getWalletContext: function () {
+			return {
+				address: state.address,
+				canSign: !!state.keys,
+				mode: state.mode,
+				feeSatoshis: amountToSatoshis(state.fee),
+				feeSugar: Number(state.fee).toFixed(CONFIG.decimals).replace(/0+$/, '').replace(/\.$/, ''),
+				backend: getBackend()
+			};
+		},
+		showToast: showToast,
+		copyValue: copyValue,
+		openQrScanner: openQrScanner,
+		closeQrScanner: stopQrScanner,
+		switchTab: switchTab,
+		explorerTx: CONFIG.explorerTx,
+		broadcastRelayAnchor: broadcastFileRelayAnchor,
+		getTransaction: function (txid) {
+			var value = String(txid || '').trim().toLowerCase();
+			if (!/^[0-9a-f]{64}$/.test(value)) {
+				return Promise.reject(new Error('Sugarchain transaction ID is invalid.'));
+			}
+			return requestApi('/transaction/' + encodeURIComponent(value)).then(function (data) {
+				if (data && data.error) {
+					throw new Error(data.error.message || data.error || 'Transaction was not found.');
+				}
+				return data;
+			});
+		}
+	};
 
 	document.addEventListener('DOMContentLoaded', init);
 })();
