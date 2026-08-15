@@ -633,7 +633,7 @@ select:focus {
 	right: 14px;
 	bottom: 16px;
 	left: 14px;
-	z-index: 30;
+	z-index: 80;
 	max-width: 452px;
 	margin: 0 auto;
 	padding: 12px 14px;

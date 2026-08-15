@@ -667,7 +667,7 @@
 			</div>
 		</div>
 
-		<div id="keylinkSecretModal" class="modal" role="dialog" aria-modal="true" aria-label="Decrypted Keylink secret">
+		<div id="keylinkSecretModal" class="modal keylink-action-modal" role="dialog" aria-modal="true" aria-label="Decrypted Keylink secret">
 			<div class="modal-card keylink-secret-card">
 				<h2>Secret</h2>
 				<div id="keylinkSecretText" class="keylink-secret-text"></div>
@@ -675,7 +675,7 @@
 			</div>
 		</div>
 
-		<div id="keylinkQrModal" class="modal" role="dialog" aria-modal="true" aria-label="Permanent Keylink QR">
+		<div id="keylinkQrModal" class="modal keylink-action-modal" role="dialog" aria-modal="true" aria-label="Permanent Keylink QR">
 			<div class="modal-card keylink-qr-card">
 				<h2>Permanent Keylink QR</h2>
 				<div id="keylinkQrCode" class="keylink-qr-code"></div>
@@ -686,17 +686,30 @@
 			</div>
 		</div>
 
-		<div id="keylinkTransferModal" class="modal" role="dialog" aria-modal="true" aria-label="Confirm Keylink ownership transfer">
-			<div class="modal-card keylink-transfer-card">
-				<h2>Transfer Keylink Ownership</h2>
+		<div id="keylinkTransferModal" class="modal keylink-action-modal" role="dialog" aria-modal="true" aria-labelledby="keylinkApproveTitle">
+			<div class="modal-card keylink-transfer-card keylink-confirm-card">
+				<h2 id="keylinkApproveTitle">Approve Ownership Request?</h2>
+				<p>The requester will become the new owner and receive access to this secret after the Sugarchain transfer is accepted.</p>
 				<div class="notice warning">After Sugarchain accepts this transfer, Keylink will no longer authorize this identity to view the secret. The permanent QR remains unchanged.</div>
 				<div class="send-summary active">
 					<div class="summary-line"><span>Secret</span><strong id="keylinkTransferSecret"></strong></div>
-					<div class="summary-line"><span>From</span><strong id="keylinkTransferFrom" class="break-anywhere"></strong></div>
-					<div class="summary-line"><span>To</span><strong id="keylinkTransferTo" class="break-anywhere"></strong></div>
+					<div class="summary-line"><span>Current owner</span><strong id="keylinkTransferFrom" class="break-anywhere"></strong></div>
+					<div class="summary-line"><span>Requester</span><strong id="keylinkTransferTo" class="break-anywhere"></strong></div>
 					<div class="summary-line"><span>Estimated fee</span><strong id="keylinkTransferFee"></strong></div>
 				</div>
-				<div class="modal-actions"><button id="keylinkCancelTransfer" class="button secondary" type="button">Cancel</button><button id="keylinkConfirmTransfer" class="button" type="button">SIGN &amp; BROADCAST</button></div>
+				<div class="modal-actions"><button id="keylinkCancelTransfer" class="button secondary" type="button">Keep Request</button><button id="keylinkConfirmTransfer" class="button" type="button">APPROVE &amp; TRANSFER</button></div>
+			</div>
+		</div>
+
+		<div id="keylinkDenyModal" class="modal keylink-action-modal" role="dialog" aria-modal="true" aria-labelledby="keylinkDenyTitle">
+			<div class="modal-card keylink-deny-card keylink-confirm-card">
+				<h2 id="keylinkDenyTitle">Deny Ownership Request?</h2>
+				<p>The requester will not receive access to this secret. They can submit a new request later.</p>
+				<div class="send-summary active">
+					<div class="summary-line"><span>Secret</span><strong id="keylinkDenySecret"></strong></div>
+					<div class="summary-line"><span>Requester</span><strong id="keylinkDenyRequester" class="break-anywhere"></strong></div>
+				</div>
+				<div class="modal-actions"><button id="keylinkCancelDeny" class="button secondary" type="button">Keep Request</button><button id="keylinkConfirmDeny" class="button danger" type="button">DENY REQUEST</button></div>
 			</div>
 		</div>
 

@@ -16,6 +16,7 @@
 		pollTimer: 0,
 		polling: false,
 		pendingApproval: null,
+		pendingDenial: null,
 		activeSecretId: '',
 		plainSecret: ''
 	};
@@ -613,7 +614,8 @@
 		refreshIcons();
 	}
 
-	async function viewSecret() {
+	async function viewSecret(button) {
+		setBusy(button, true, 'Opening…');
 		try {
 			var remote = await resolveSecret(state.activeSecretId);
 			if (remote.current_owner !== state.ownerId) { throw new Error('This Keylink has been transferred. Your identity is no longer the current owner.'); }
@@ -622,7 +624,12 @@
 			try { state.plainSecret = await Crypto.decryptSecret(remote.encrypted_secret, key); } finally { key.fill(0); }
 			$('#keylinkSecretText').textContent = state.plainSecret;
 			$('#keylinkSecretModal').classList.add('active');
-		} catch (error) { toast(error.message || 'Secret could not be opened.', 'danger'); }
+			$('#keylinkCloseSecret').focus();
+		} catch (error) {
+			toast(error.message || 'Secret could not be opened.', 'danger');
+		} finally {
+			setBusy(button, false);
+		}
 	}
 
 	function closeSecretModal() {
@@ -646,16 +653,49 @@
 		$('#keylinkQrModal').classList.add('active');
 	}
 
-	async function denyRequest(requestId) {
-		if (!window.confirm('Deny this ownership request?')) { return; }
+	function prepareDenial(requestId) {
+		var record = findRecord(state.activeSecretId);
+		var request = record && requestForId(record, requestId);
+		if (!record || !request || request.status !== 'pending') {
+			toast('This ownership request is no longer pending.', 'danger');
+			return;
+		}
+		state.pendingDenial = { secretId: record.secret_id, requestId: request.request_id };
+		$('#keylinkDenySecret').textContent = short(record.secret_id);
+		$('#keylinkDenyRequester').textContent = request.requester_id;
+		$('#keylinkDenyModal').classList.add('active');
+		$('#keylinkConfirmDeny').focus();
+	}
+
+	function closeDenyModal() {
+		state.pendingDenial = null;
+		closeModal('#keylinkDenyModal');
+	}
+
+	async function denyRequest() {
+		if (!state.pendingDenial) { return; }
+		var button = $('#keylinkConfirmDeny');
+		var pending = state.pendingDenial;
+		setBusy(button, true, 'Denying…');
 		try {
 			var context = walletContext();
-			var record = findRecord(state.activeSecretId);
-			var decision = await signRecord({ protocol: Crypto.PROTOCOL, type: 'ownership_request_denial', request_id: requestId,
-				secret_id: record.secret_id, owner_id: context.address, owner_public_key: context.publicKey.toLowerCase(), nonce: randomHex(), created_at: new Date().toISOString() });
-			var result = await relayRequest('/api/keylink/secrets/' + record.secret_id + '/requests/' + requestId + '/deny', { method: 'POST', body: JSON.stringify(decision) });
-			await mergeRemoteState(result.state); await reloadRecords(); openDetail(record.secret_id); toast('Ownership request denied.');
-		} catch (error) { toast(error.message || 'Request could not be denied.', 'danger'); }
+			var remote = await resolveSecret(pending.secretId);
+			if (remote.current_owner !== context.address) { throw new Error('You are no longer the current owner of this Keylink.'); }
+			var request = requestForId({ requests: remote.requests }, pending.requestId);
+			if (!request || request.status !== 'pending') { throw new Error('This ownership request is no longer pending.'); }
+			var decision = await signRecord({ protocol: Crypto.PROTOCOL, type: 'ownership_request_denial', request_id: pending.requestId,
+				secret_id: remote.secret_id, owner_id: context.address, owner_public_key: context.publicKey.toLowerCase(), nonce: randomHex(), created_at: new Date().toISOString() });
+			var result = await relayRequest('/api/keylink/secrets/' + remote.secret_id + '/requests/' + pending.requestId + '/deny', { method: 'POST', body: JSON.stringify(decision) });
+			await mergeRemoteState(result.state);
+			await reloadRecords();
+			closeDenyModal();
+			await openDetail(remote.secret_id);
+			toast('Ownership request denied.');
+		} catch (error) {
+			toast(error.message || 'Request could not be denied.', 'danger');
+		} finally {
+			setBusy(button, false);
+		}
 	}
 
 	async function cancelRequest() {
@@ -671,7 +711,8 @@
 		} catch (error) { toast(error.message || 'Request could not be cancelled.', 'danger'); }
 	}
 
-	async function prepareApproval(requestId) {
+	async function prepareApproval(requestId, button) {
+		setBusy(button, true, 'Preparing…');
 		try {
 			var context = walletContext();
 			await ensureIdentity();
@@ -694,7 +735,12 @@
 			$('#keylinkTransferTo').textContent = request.requester_id;
 			$('#keylinkTransferFee').textContent = context.feeSugar + ' SUGAR';
 			$('#keylinkTransferModal').classList.add('active');
-		} catch (error) { toast(error.message || 'Transfer could not be prepared.', 'danger'); }
+			$('#keylinkCancelTransfer').focus();
+		} catch (error) {
+			toast(error.message || 'Transfer could not be prepared.', 'danger');
+		} finally {
+			setBusy(button, false);
+		}
 	}
 
 	async function confirmApproval() {
@@ -799,16 +845,16 @@
 			if (action) {
 				if (action.dataset.keylinkDetailAction === 'close') { closeModal('#keylinkDetailModal'); }
 				if (action.dataset.keylinkDetailAction === 'request') { requestOwnership(); }
-				if (action.dataset.keylinkDetailAction === 'view') { viewSecret(); }
+				if (action.dataset.keylinkDetailAction === 'view') { viewSecret(action); }
 				if (action.dataset.keylinkDetailAction === 'qr') { showQr(); }
 				if (action.dataset.keylinkDetailAction === 'cancel-request') { cancelRequest(); }
 			}
 			var copy = event.target.closest('[data-copy-value]');
 			if (copy) { Bridge.copyValue(copy.dataset.copyValue, 'Requester address copied.'); }
 			var approve = event.target.closest('[data-keylink-request-approve]');
-			if (approve) { prepareApproval(approve.dataset.keylinkRequestApprove); }
+			if (approve) { prepareApproval(approve.dataset.keylinkRequestApprove, approve); }
 			var deny = event.target.closest('[data-keylink-request-deny]');
-			if (deny) { denyRequest(deny.dataset.keylinkRequestDeny); }
+			if (deny) { prepareDenial(deny.dataset.keylinkRequestDeny); }
 		});
 		$('#keylinkCopySecret').addEventListener('click', function () { if (state.plainSecret) { Bridge.copyValue(state.plainSecret, 'Secret copied.'); } });
 		$('#keylinkCloseSecret').addEventListener('click', closeSecretModal);
@@ -816,6 +862,8 @@
 		$('#keylinkCopyQrUri').addEventListener('click', function () { Bridge.copyValue($('#keylinkQrUri').value, 'Permanent Keylink copied.'); });
 		$('#keylinkCancelTransfer').addEventListener('click', function () { state.pendingApproval = null; closeModal('#keylinkTransferModal'); });
 		$('#keylinkConfirmTransfer').addEventListener('click', confirmApproval);
+		$('#keylinkCancelDeny').addEventListener('click', closeDenyModal);
+		$('#keylinkConfirmDeny').addEventListener('click', denyRequest);
 		$('#keylinkCloseIdentity').addEventListener('click', function () { closeModal('#keylinkIdentityModal'); });
 		$('#keylinkCopyIdentity').addEventListener('click', function () { Bridge.copyValue($('#keylinkIdentityPublic').value, 'Public encryption key copied.'); });
 		$('#keylinkExportIdentity').addEventListener('submit', exportIdentity);
@@ -823,7 +871,8 @@
 		$$('[data-keylink-modal-close]').forEach(function (button) { button.addEventListener('click', function () { closeModal(button.dataset.keylinkModalClose); }); });
 		window.addEventListener('sweetwallet:sensitive-cleared', function () {
 			state.identityPair = null; state.identityRecord = null; state.ownerId = ''; state.records = []; state.plainSecret = '';
-			window.clearInterval(state.pollTimer); state.pollTimer = 0; closeSecretModal();
+			state.pendingApproval = null; state.pendingDenial = null;
+			window.clearInterval(state.pollTimer); state.pollTimer = 0; closeSecretModal(); closeModal('#keylinkTransferModal'); closeModal('#keylinkDenyModal');
 		});
 	}
 
