@@ -29,6 +29,12 @@ server.js
 SECURITY.md
 README.md
 cloudflare-worker.js
+Agent Instructions_*
+WALLET_FUNCTIONALITY.md
+keylink-worker-protocol.mjs
+worker-configuration.d.ts
+worker-startup.cpuprofile
+vitest.config.mjs
 wrangler.jsonc
 *.log
 *.pem

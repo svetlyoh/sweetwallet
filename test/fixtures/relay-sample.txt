@@ -1,2 +1,0 @@
-SweetWallet File Key Relay browser test.
-This plaintext should be recovered only with the matching recipient encryption key.

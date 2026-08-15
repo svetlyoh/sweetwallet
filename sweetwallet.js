@@ -623,15 +623,8 @@
 
 	function handleQrScannerPayload(raw) {
 		var purpose = state.qrScanner.purpose || 'payment';
-		if (purpose === 'relay-recipient' && window.SweetWalletFileRelay) {
-			if (window.SweetWalletFileRelay.handleScannedRecipient(raw)) {
-				stopQrScanner();
-				return true;
-			}
-			return false;
-		}
-		if (purpose === 'relay-capsule' && window.SweetWalletFileRelay) {
-			if (window.SweetWalletFileRelay.handleScannedCapsule(raw)) {
+		if (purpose === 'keylink' && window.SweetWalletKeylink) {
+			if (window.SweetWalletKeylink.handleScannedKeylink(raw)) {
 				stopQrScanner();
 				return true;
 			}
@@ -641,21 +634,15 @@
 	}
 
 	function qrScannerPrompt() {
-		if (state.qrScanner.purpose === 'relay-recipient') {
-			return 'Point your camera at a File Relay recipient public-key QR.';
-		}
-		if (state.qrScanner.purpose === 'relay-capsule') {
-			return 'Point your camera at a sugarfilekey relay capsule QR.';
+		if (state.qrScanner.purpose === 'keylink') {
+			return 'Point your camera at a permanent Keylink secret QR.';
 		}
 		return 'Point your camera at a Sugarchain receive QR.';
 	}
 
 	function qrScannerInvalidMessage() {
-		if (state.qrScanner.purpose === 'relay-recipient') {
-			return 'QR found, but it is not a supported File Relay recipient key.';
-		}
-		if (state.qrScanner.purpose === 'relay-capsule') {
-			return 'QR found, but it is not a supported File Relay capsule.';
+		if (state.qrScanner.purpose === 'keylink') {
+			return 'QR found, but it is not a supported Keylink secret identifier.';
 		}
 		return 'QR found, but it is not a Sugarchain receive address.';
 	}
@@ -730,8 +717,7 @@
 		state.qrScanner.active = true;
 		state.qrScanner.lastInvalid = '';
 		if ($('#qrScannerTitle')) {
-			$('#qrScannerTitle').textContent = state.qrScanner.purpose === 'relay-recipient' ? 'Scan Recipient Encryption Key' :
-				(state.qrScanner.purpose === 'relay-capsule' ? 'Scan File Relay Capsule' : 'Scan Recipient QR');
+			$('#qrScannerTitle').textContent = state.qrScanner.purpose === 'keylink' ? 'Scan Keylink QR' : 'Scan Recipient QR';
 		}
 		setQrScannerStatus(qrScannerPrompt());
 		$('#qrScannerModal').classList.add('active');
@@ -1070,9 +1056,9 @@
 			button.disabled = isLocked;
 			button.title = isLocked ? 'Unlock the wallet before sending.' : (!canSign && isWatch ? 'Open this wallet with its private key before sending.' : '');
 		});
-		$$('[data-tab="file-relay"]').forEach(function (button) {
+		$$('[data-tab="keylink"]').forEach(function (button) {
 			button.disabled = !canSign;
-			button.title = canSign ? '' : 'Open and unlock a SUGAR wallet before using File Key Relay.';
+			button.title = canSign ? '' : 'Open and unlock a SUGAR wallet before using Keylink.';
 		});
 		if ($('#savedWalletInfo')) {
 			$('#savedWalletInfo').classList.toggle('hidden', !state.savedVault);
@@ -1109,10 +1095,10 @@
 			button.disabled = isLocked;
 			button.title = isLocked ? 'Unlock the wallet to use this menu item.' : '';
 		});
-		var relayButton = $('#menuSheet .menu-item[data-tab="file-relay"]');
-		if (relayButton) {
-			relayButton.disabled = !state.keys;
-			relayButton.title = state.keys ? '' : 'Open and unlock a SUGAR wallet before using File Key Relay.';
+		var keylinkButton = $('#menuSheet .menu-item[data-tab="keylink"]');
+		if (keylinkButton) {
+			keylinkButton.disabled = !state.keys;
+			keylinkButton.title = state.keys ? '' : 'Open and unlock a SUGAR wallet before using Keylink.';
 		}
 		if ($('#menuLockButton')) {
 			var canLock = !!state.keys && !!state.savedVault && state.mode === 'saved';
@@ -2278,23 +2264,20 @@
 		throw new Error('The backend did not return a txid or accepted transaction response.');
 	}
 
-	function broadcastFileRelayAnchor(anchorText) {
-		var header = String(anchorText || '');
+	function broadcastKeylinkTransfer(anchorHex) {
+		var header = String(anchorHex || '').trim().toLowerCase();
 		var fee = amountToSatoshis(state.fee);
 		var transaction;
 		var raw;
 		var localTxid;
 		if (!state.keys || !state.address) {
-			return Promise.reject(new Error('Open and unlock a SUGAR wallet before broadcasting a relay anchor.'));
+			return Promise.reject(new Error('Open and unlock a SUGAR wallet before transferring a Keylink.'));
 		}
-		if (!/^SGF1\|[0-9a-f]{16}\|[0-9a-f]{32}\|[0-9a-f]{16}$/i.test(header)) {
-			return Promise.reject(new Error('The SGF1 OP_RETURN header is invalid.'));
-		}
-		if (new TextEncoder().encode(header).length > 80) {
-			return Promise.reject(new Error('The SGF1 OP_RETURN header exceeds 80 bytes.'));
+		if (!/^[0-9a-f]{152}$/.test(header) || !header.startsWith('4b4c5431')) {
+			return Promise.reject(new Error('The KLT1 OP_RETURN ownership record is invalid.'));
 		}
 		if (!Number.isFinite(fee) || fee < amountToSatoshis(CONFIG.fee)) {
-			return Promise.reject(new Error('The configured relay fee is invalid.'));
+			return Promise.reject(new Error('The configured Keylink transfer fee is invalid.'));
 		}
 		if (state.broadcasting) {
 			return Promise.reject(new Error('Another transaction is already being broadcast.'));
@@ -2305,11 +2288,11 @@
 		}).then(function (selection) {
 			selection.change = selection.inputTotal - fee;
 			if (selection.change <= 0) {
-				throw new Error('Insufficient SUGAR to pay the relay fee and create a change output.');
+				throw new Error('Insufficient SUGAR to pay the Keylink transfer fee and create a change output.');
 			}
 			var opReturnScript = bitcoin.script.compile([
 				bitcoin.opcodes.OP_RETURN,
-				bitcoin.Buffer(header, 'utf8')
+				bitcoin.Buffer(header, 'hex')
 			]);
 			var builder = createTransactionBuilder([{
 				script: opReturnScript,
@@ -2327,9 +2310,9 @@
 				rawTransaction: raw
 			};
 		}).catch(function (error) {
-			var message = error && error.message || 'File Relay anchor broadcast failed.';
+			var message = error && error.message || 'Keylink ownership transaction failed.';
 			if (/Not enough spendable SUGAR/i.test(message)) {
-				message = 'Insufficient SUGAR or no spendable UTXO is available for the relay fee.';
+				message = 'Insufficient SUGAR or no spendable UTXO is available for the Keylink transfer fee.';
 			}
 			throw new Error(message);
 		}).finally(function () {
@@ -2486,8 +2469,8 @@
 			showToast('Unlock the wallet before sending.', 'danger');
 			name = 'locked';
 		}
-		if (name === 'file-relay' && !state.keys) {
-			showToast('Open and unlock a SUGAR wallet before using File Key Relay.', 'danger');
+		if (name === 'keylink' && !state.keys) {
+			showToast('Open and unlock a SUGAR wallet before using Keylink.', 'danger');
 			name = state.mode === 'locked' ? 'locked' : 'activity';
 		}
 		$$('.panel').forEach(function (panel) {
@@ -2500,8 +2483,8 @@
 		if (name === 'security') {
 			renderSecurityUi();
 		}
-		if (name === 'file-relay' && window.SweetWalletFileRelay) {
-			window.SweetWalletFileRelay.onPanelOpen();
+		if (name === 'keylink' && window.SweetWalletKeylink) {
+			window.SweetWalletKeylink.onPanelOpen();
 		}
 	}
 
@@ -3728,10 +3711,11 @@
 		}
 	}
 
-	window.SweetWalletFileRelayBridge = {
+	window.SweetWalletKeylinkBridge = {
 		getWalletContext: function () {
 			return {
 				address: state.address,
+				publicKey: state.publicKeyHex,
 				canSign: !!state.keys,
 				mode: state.mode,
 				feeSatoshis: amountToSatoshis(state.fee),
@@ -3745,7 +3729,21 @@
 		closeQrScanner: stopQrScanner,
 		switchTab: switchTab,
 		explorerTx: CONFIG.explorerTx,
-		broadcastRelayAnchor: broadcastFileRelayAnchor,
+		signRecord: function (record) {
+			if (!state.keys) {
+				return Promise.reject(new Error('Unlock the wallet before signing a Keylink record.'));
+			}
+			var unsigned = {};
+			Object.keys(record || {}).forEach(function (key) {
+				if (key !== 'signature' && key !== 'ownership_txid') {
+					unsigned[key] = record[key];
+				}
+			});
+			return Vault.sha256Hex(Vault.stableStringify(unsigned)).then(function (digestHex) {
+				return state.keys.sign(bitcoin.Buffer(digestHex, 'hex')).toString('hex');
+			});
+		},
+		broadcastKeylinkTransfer: broadcastKeylinkTransfer,
 		getTransaction: function (txid) {
 			var value = String(txid || '').trim().toLowerCase();
 			if (!/^[0-9a-f]{64}$/.test(value)) {

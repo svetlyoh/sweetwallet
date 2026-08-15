@@ -15,7 +15,7 @@ SweetWallet is a mobile-first Sugarchain web wallet focused on wallet-only behav
 - View and copy address, public key, private key WIF, and SegWit redeem script
 - Switch Sugarchain API backend
 - Open address and transaction history in the Sugarchain explorer
-- Relay encrypted file keys to a recipient with a public Sugarchain SGF1 anchor
+- Create, request, transfer, and reveal encrypted Keylink secrets with Sugarchain-anchored ownership
 - Logout without storing private key material
 - Optional starter funding for newly created zero-balance wallets when the local server has a funding wallet configured
 
@@ -53,21 +53,23 @@ The configured feeder wallet address is `sugar1q39n666w687nxm9x98tx5kgw2uvk780gt
 
 SweetWallet does not fake balances, does not auto-broadcast user spend transactions, and does not send private keys or WIFs to a server. Back up the WIF shown in the Keys panel before closing a newly created wallet.
 
-## File Key Relay
+## Keylink
 
-File Key Relay lets a sender share an encrypted file without directly sending its plaintext decryption key. The sender selects a file and the recipient's dedicated X25519 public encryption key. SweetWallet then:
+Keylink is a full-screen encrypted-secret library with one permanent public identifier per secret:
 
-1. Creates a fresh random 256-bit file key and encrypts the file locally with AES-256-GCM.
-2. Uses ephemeral X25519 ECDH and HKDF-SHA256 to derive a one-time wrapping key.
-3. Encrypts the file key into an authenticated capsule for the recipient.
-4. With explicit confirmation, publishes a compact `SGF1` OP_RETURN anchor containing truncated public hashes. This spends only the displayed SUGAR network fee and returns change to the active wallet.
-5. Generates a public `sugarfilekey://open` QR containing the encrypted key capsule, public cryptographic data, encrypted-file hash, and txid.
+`keylink://secret/<128-bit-secret-id>`
 
-The QR code, encrypted file, and blockchain record may all be public. Only the matching recipient File Relay private encryption key can unwrap the file key. The plaintext file key is never placed on-chain, in the QR, in relay history, or on a server. Decrypted files remain local to the browser.
+The QR contains only that identifier. Secret text is limited to 300 characters and encrypted locally with a random AES-256-GCM content key. The content key is wrapped to the current owner's dedicated X25519 identity with ephemeral X25519, HKDF-SHA256, and AES-GCM. Labels stay local and plaintext secrets are not persisted.
 
-The dedicated File Relay key is separate from the SUGAR spending key and cannot spend SUGAR. Its private part is stored locally in browser IndexedDB. The setup screen can export a password-encrypted JSON backup. Losing the recipient encryption key and all backups means old capsules cannot be decrypted.
+Ownership requests are signed by the requester's active Sugarchain key and coordinated off-chain by the Cloudflare relay. Approval rewraps the same content key to the requester, signs an ownership transition, and—only after explicit wallet confirmation—broadcasts an exact 76-byte binary `KLT1` OP_RETURN. The normal SweetWallet UTXO selection, fee, reauthentication, signing, broadcast, and change-return rules apply. No secret text or decryption key is placed on-chain.
 
-Sugarchain proves that an anchored relay record existed at or before its block timestamp and that the anchored manifest cannot be quietly changed. It does not prove the real-world identity of either party, that a file is safe, or that a recipient is the intended legal person. The optional QR-only mode retains the cryptographic key exchange but creates no Sugarchain timestamp proof.
+The Cloudflare Worker uses one strongly consistent, SQLite-backed Durable Object per Secret ID. It stores only signed public metadata, encrypted secret material, the current owner envelope, requests, and transfer history. Before committing a transfer, the Worker verifies the Sugarchain transaction contains the expected `KLT1` record. The relay coordinates and indexes the signed chain state; it never receives wallet private keys, X25519 private keys, or plaintext secrets.
+
+After Sugarchain accepts a transfer, the prior owner's local envelope and encrypted-secret copy are removed and Keylink no longer offers that identity a View Secret action. This controls future Keylink-mediated access; it cannot make a prior owner forget plaintext they already viewed.
+
+The core rule is: **The QR identifies the secret. Sugarchain identifies the current owner. The current owner's cryptographic identity determines whether Keylink will reveal the secret.**
+
+**The QR stays. Ownership moves.**
 
 ## Starter Funding
 
