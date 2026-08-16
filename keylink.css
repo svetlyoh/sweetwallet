@@ -424,6 +424,19 @@
 	font-size: 0.84rem;
 }
 
+.keylink-owner-pin-panel .keylink-switch-row {
+	color: #f4fff7;
+}
+
+.keylink-owner-pin-panel .keylink-switch-row strong {
+	color: #f4fff7;
+}
+
+.keylink-owner-pin-panel .keylink-switch-row small,
+.keylink-owner-pin-panel .keylink-pin-note {
+	color: #c7e8d1;
+}
+
 .keylink-switch-row input[type="checkbox"] {
 	width: 24px;
 	height: 24px;
