@@ -24,6 +24,7 @@
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
 		<link rel="stylesheet" href="sweetwallet.css">
+		<link rel="stylesheet" href="keylink.css">
 	</head>
 	<body>
 		<div class="crypto-field" aria-hidden="true">
@@ -279,6 +280,59 @@
 									</button>
 								</form>
 								<div id="lastTxBox" class="notice hidden">Last transaction: <a id="lastTxLink" class="break-anywhere" href="#" target="_blank" rel="noopener"></a></div>
+							</div>
+
+							<div id="keylinkPanel" class="panel keylink-panel" data-panel="keylink">
+								<section id="keylinkLibraryView" class="keylink-app-view">
+									<header class="keylink-header">
+										<button class="back-button" type="button" data-tab="activity" aria-label="Back to activity"><i data-lucide="arrow-left"></i></button>
+										<div><span class="keylink-eyebrow">Your Secrets</span><h2>Keylink</h2></div>
+										<button class="icon-button keylink-identity-button" type="button" data-keylink-action="identity" aria-label="Keylink encryption identity"><i data-lucide="shield-keyhole"></i></button>
+									</header>
+									<div class="keylink-toolbar">
+										<div class="keylink-primary-actions">
+											<button class="button" type="button" data-keylink-action="create"><i data-lucide="plus"></i>Create Secret</button>
+											<button class="button subtle" type="button" data-keylink-action="scan"><i data-lucide="scan-qr-code"></i>Scan QR</button>
+											<button class="keylink-paste-button" type="button" data-keylink-action="paste" aria-label="Paste Keylink"><i data-lucide="clipboard-paste"></i></button>
+										</div>
+										<div class="keylink-search-row">
+											<label class="keylink-search"><i data-lucide="search"></i><span class="visually-hidden">Search Keylinks</span><input id="keylinkSearch" type="search" placeholder="Search Keylinks" autocomplete="off"></label>
+											<label class="keylink-sort"><span class="visually-hidden">Sort Keylinks</span><select id="keylinkSort"><option value="active">Recently Active</option><option value="created">Recently Created</option><option value="owned">Owned</option><option value="pending">Pending</option><option value="transferred">Transferred</option></select></label>
+										</div>
+										<div class="keylink-filters" role="tablist" aria-label="Filter Keylinks">
+											<button class="active" type="button" data-keylink-filter="all">All</button>
+											<button type="button" data-keylink-filter="owned">Owned</button>
+											<button type="button" data-keylink-filter="created">Created</button>
+											<button type="button" data-keylink-filter="obtained">Obtained</button>
+											<button type="button" data-keylink-filter="pending">Pending</button>
+											<button type="button" data-keylink-filter="transferred">Transferred</button>
+										</div>
+									</div>
+									<div id="keylinkList" class="keylink-list" aria-live="polite"></div>
+									<footer class="keylink-principle"><strong>The QR stays. Ownership moves.</strong><span>The QR identifies the secret. Sugarchain identifies the current owner.</span></footer>
+								</section>
+								<section id="keylinkCreateView" class="keylink-app-view hidden">
+									<header class="keylink-header">
+										<button id="keylinkCreateBack" class="back-button" type="button" aria-label="Back to Keylink library"><i data-lucide="arrow-left"></i></button>
+										<div><span class="keylink-eyebrow">Local encryption</span><h2>Create Secret</h2></div>
+									</header>
+									<form id="keylinkCreateForm" class="keylink-create-form" autocomplete="off">
+										<div class="form-row"><div class="keylink-label-row"><label for="keylinkSecretInput">Secret</label><span id="keylinkSecretCount">0 / 300</span></div><textarea id="keylinkSecretInput" rows="8" maxlength="300" required placeholder="Enter the secret to encrypt locally…"></textarea></div>
+										<div class="form-row"><label for="keylinkLabelInput">Optional label</label><input id="keylinkLabelInput" type="text" maxlength="80" placeholder="Example: Safe combination"><small>Stored only on this device. Never placed on-chain or sent to the relay.</small></div>
+										<section class="keylink-pin-settings" aria-labelledby="keylinkCreatePinHeading">
+											<label class="keylink-switch-row" for="keylinkRequirePin"><span><strong id="keylinkCreatePinHeading">Require PIN</strong><small>Gate ownership requests with a separate 6-digit PIN.</small></span><input id="keylinkRequirePin" type="checkbox"></label>
+											<div id="keylinkCreatePinOptions" class="keylink-pin-options hidden">
+												<div class="keylink-pin-display"><span>PIN</span><output id="keylinkCreatePinValue" aria-live="polite"></output></div>
+												<div class="keylink-pin-buttons"><button id="keylinkCopyCreatePin" class="button subtle" type="button"><i data-lucide="copy"></i>Copy PIN</button><button id="keylinkRegenerateCreatePin" class="button subtle" type="button"><i data-lucide="refresh-cw"></i>Regenerate</button></div>
+												<label class="keylink-switch-row" for="keylinkCreateAutoapprove"><span><strong>Autoapprove valid PIN request</strong></span><input id="keylinkCreateAutoapprove" type="checkbox" checked></label>
+												<p class="keylink-pin-note">Autoapprove only works while this wallet is online and unlocked.</p>
+												<div class="notice warning"><strong>Autoapprove is on by default.</strong> The first valid PIN request will transfer this Keylink automatically while this wallet is online and unlocked.</div>
+											</div>
+										</section>
+										<div class="notice"><strong>Permanent identity:</strong> Keylink creates one QR that continues to identify this secret across every ownership transfer.</div>
+										<button id="keylinkCreateSubmit" class="button" type="submit"><i data-lucide="lock-keyhole"></i>Encrypt &amp; Create Keylink</button>
+									</form>
+								</section>
 							</div>
 
 							<div class="panel" data-panel="keys">
@@ -580,18 +634,21 @@
 					</button>
 				</div>
 				<div class="menu-items">
-					<button class="menu-item" type="button" data-tab="activity"><i data-lucide="list"></i>Activity</button>
+					<button class="menu-item" type="button" data-tab="receive"><i data-lucide="qr-code"></i>Receive</button>
+					<button class="menu-item" type="button" data-tab="send"><i data-lucide="send"></i>Send</button>
+					<button class="menu-item keylink-menu-item" type="button" data-tab="keylink"><i data-lucide="key-round"></i><span>Keylink</span><span class="keylink-menu-badge hidden" data-keylink-badge></span></button>
 					<button id="menuLockButton" class="menu-item" type="button"><i data-lucide="lock"></i>Lock</button>
 					<button class="menu-item" type="button" data-tab="keys"><i data-lucide="key-round"></i>Keys</button>
 					<button class="menu-item" type="button" data-tab="broadcast"><i data-lucide="radio"></i>Broadcast</button>
 					<button class="menu-item" type="button" data-tab="settings"><i data-lucide="settings"></i>Settings</button>
+					<button class="menu-item" type="button" data-tab="activity"><i data-lucide="history"></i>Explorer History</button>
 					<button id="menuSetupPinButton" class="menu-item menu-pin-setup" type="button">
 						<i data-lucide="shield-plus"></i>
 						<span>Manage PIN</span>
 						<i class="menu-pin-sparkle" data-lucide="sparkles"></i>
 					</button>
 					<button class="menu-item" type="button" data-tab="security"><i data-lucide="shield-check"></i>Security</button>
-					<button id="logoutButton" class="menu-item" type="button"><i data-lucide="unlink"></i>Disconnect Wallet</button>
+					<button id="logoutButton" class="menu-item" type="button"><i data-lucide="unlink"></i>Logout / Disconnect Wallet</button>
 				</div>
 			</div>
 		</div>
@@ -612,9 +669,120 @@
 			</div>
 		</div>
 
+		<div id="keylinkDetailModal" class="modal keylink-sheet-modal" role="dialog" aria-modal="true" aria-label="Keylink secret details">
+			<div class="modal-card keylink-detail-card">
+				<div class="keylink-modal-header"><h2 id="keylinkDetailTitle">Keylink Secret</h2><button type="button" class="icon-button" data-keylink-detail-action="close" aria-label="Close details"><i data-lucide="x"></i></button></div>
+				<div id="keylinkDetailBody" class="keylink-detail-body"></div>
+				<div id="keylinkDetailActions" class="keylink-detail-actions"></div>
+			</div>
+		</div>
+
+		<div id="keylinkSecretModal" class="modal keylink-action-modal" role="dialog" aria-modal="true" aria-label="Decrypted Keylink secret">
+			<div class="modal-card keylink-secret-card">
+				<h2>Secret</h2>
+				<div id="keylinkSecretText" class="keylink-secret-text"></div>
+				<div class="modal-actions"><button id="keylinkCloseSecret" class="button secondary" type="button">Close</button><button id="keylinkCopySecret" class="button" type="button"><i data-lucide="copy"></i>Copy</button></div>
+			</div>
+		</div>
+
+		<div id="keylinkQrModal" class="modal keylink-action-modal" role="dialog" aria-modal="true" aria-label="Permanent Keylink QR">
+			<div class="modal-card keylink-qr-card">
+				<h2>Permanent Keylink QR</h2>
+				<div id="keylinkQrCode" class="keylink-qr-code"></div>
+				<dl class="keylink-detail-grid"><div><dt>Secret ID</dt><dd id="keylinkQrId" class="break-anywhere"></dd></div><div><dt>Current owner</dt><dd id="keylinkQrOwner"></dd></div></dl>
+				<div class="field-pair"><input id="keylinkQrUri" class="monospace" readonly><button id="keylinkCopyQrUri" class="copy-button" type="button" aria-label="Copy permanent Keylink"><i data-lucide="copy"></i></button></div>
+				<div class="notice">This public QR identifies the secret; it does not grant ownership or reveal its contents.</div>
+				<button id="keylinkCloseQr" class="button secondary" type="button">Close</button>
+			</div>
+		</div>
+
+		<div id="keylinkTransferModal" class="modal keylink-action-modal" role="dialog" aria-modal="true" aria-labelledby="keylinkApproveTitle">
+			<div class="modal-card keylink-transfer-card keylink-confirm-card">
+				<h2 id="keylinkApproveTitle">Approve Ownership Request?</h2>
+				<p>The requester will become the new owner and receive access to this secret after the Sugarchain transfer is accepted.</p>
+				<div class="notice warning">After Sugarchain accepts this transfer, Keylink will no longer authorize this identity to view the secret. The permanent QR remains unchanged.</div>
+				<div class="send-summary active">
+					<div class="summary-line"><span>Secret</span><strong id="keylinkTransferSecret"></strong></div>
+					<div class="summary-line"><span>Current owner</span><strong id="keylinkTransferFrom" class="break-anywhere"></strong></div>
+					<div class="summary-line"><span>Requester</span><strong id="keylinkTransferTo" class="break-anywhere"></strong></div>
+					<div class="summary-line"><span>Estimated fee</span><strong id="keylinkTransferFee"></strong></div>
+				</div>
+				<div class="modal-actions"><button id="keylinkCancelTransfer" class="button secondary" type="button">Keep Request</button><button id="keylinkConfirmTransfer" class="button" type="button">APPROVE &amp; TRANSFER</button></div>
+			</div>
+		</div>
+
+		<div id="keylinkDenyModal" class="modal keylink-action-modal" role="dialog" aria-modal="true" aria-labelledby="keylinkDenyTitle">
+			<div class="modal-card keylink-deny-card keylink-confirm-card">
+				<h2 id="keylinkDenyTitle">Deny Ownership Request?</h2>
+				<p>The requester will not receive access to this secret. They can submit a new request later.</p>
+				<div class="send-summary active">
+					<div class="summary-line"><span>Secret</span><strong id="keylinkDenySecret"></strong></div>
+					<div class="summary-line"><span>Requester</span><strong id="keylinkDenyRequester" class="break-anywhere"></strong></div>
+				</div>
+				<div class="modal-actions"><button id="keylinkCancelDeny" class="button secondary" type="button">Keep Request</button><button id="keylinkConfirmDeny" class="button danger" type="button">DENY REQUEST</button></div>
+			</div>
+		</div>
+
+		<div id="keylinkDisablePinModal" class="modal keylink-action-modal" role="dialog" aria-modal="true" aria-labelledby="keylinkDisablePinTitle">
+			<div class="modal-card keylink-confirm-card">
+				<h2 id="keylinkDisablePinTitle">Disable PIN Protection?</h2>
+				<p>The active PIN will be invalidated and future ownership requests will no longer require it.</p>
+				<div class="send-summary active">
+					<div class="summary-line"><span>Secret</span><strong id="keylinkDisablePinSecret"></strong></div>
+					<div class="summary-line"><span>Autoapprove</span><strong>Turned off</strong></div>
+				</div>
+				<div class="notice warning">Any reserved autoapproval will be released. Its ownership request will remain available for manual review.</div>
+				<div class="modal-actions"><button id="keylinkCancelDisablePin" class="button secondary" type="button">Keep PIN</button><button id="keylinkConfirmDisablePin" class="button danger" type="button">DISABLE PIN</button></div>
+			</div>
+		</div>
+
+		<div id="keylinkReceivedModal" class="modal keylink-action-modal" role="dialog" aria-modal="true" aria-labelledby="keylinkReceivedTitle">
+			<div class="modal-card keylink-confirm-card">
+				<h2 id="keylinkReceivedTitle">Keylink Received</h2>
+				<p>You received a secret.</p>
+				<div id="keylinkReceivedSecret" class="keylink-readonly break-anywhere"></div>
+				<div class="notice">Open the Keylink details, then use View Secret when you are ready. Plaintext is never revealed automatically.</div>
+				<div class="modal-actions"><button id="keylinkDismissReceived" class="button secondary" type="button">Later</button><button id="keylinkViewReceived" class="button" type="button"><i data-lucide="eye"></i>View Secret</button></div>
+			</div>
+		</div>
+
+		<div id="keylinkSentModal" class="modal keylink-action-modal" role="dialog" aria-modal="true" aria-labelledby="keylinkSentTitle">
+			<div class="modal-card keylink-confirm-card">
+				<h2 id="keylinkSentTitle">Keylink Sent</h2>
+				<p>You sent a secret.</p>
+				<div class="send-summary active">
+					<div class="summary-line"><span>Secret</span><strong id="keylinkSentSecret"></strong></div>
+					<div class="summary-line"><span>Sugarchain address</span><strong id="keylinkSentAddress" class="break-anywhere"></strong></div>
+				</div>
+				<div class="notice">The ownership transfer was accepted by Sugarchain. This wallet is no longer authorized to reveal the secret.</div>
+				<div class="modal-actions keylink-single-action"><button id="keylinkCloseSent" class="button" type="button">Done</button></div>
+			</div>
+		</div>
+
+		<div id="keylinkIdentityModal" class="modal keylink-sheet-modal" role="dialog" aria-modal="true" aria-label="Keylink encryption identity">
+			<div class="modal-card keylink-identity-card">
+				<div class="keylink-modal-header"><h2>Encryption Identity</h2><button id="keylinkCloseIdentity" type="button" class="icon-button" aria-label="Close identity settings"><i data-lucide="x"></i></button></div>
+				<div class="notice">This dedicated X25519 key controls future Keylink-mediated secret access. It cannot spend SUGAR.</div>
+				<label>Sugarchain owner</label><div id="keylinkIdentityOwner" class="keylink-readonly break-anywhere"></div>
+				<label for="keylinkIdentityPublic">Public encryption key</label><div class="field-pair"><input id="keylinkIdentityPublic" class="monospace" readonly><button id="keylinkCopyIdentity" class="copy-button" type="button" aria-label="Copy public encryption key"><i data-lucide="copy"></i></button></div>
+				<div class="notice warning">Back up this identity. Without it, Keylink cannot decrypt secrets encrypted to this identity.</div>
+				<form id="keylinkExportIdentity" class="keylink-identity-form" autocomplete="off"><h3>Export encrypted backup</h3><input id="keylinkBackupPassword" type="password" minlength="10" required autocomplete="new-password" placeholder="Backup password (10+ characters)"><input id="keylinkBackupPasswordConfirm" type="password" minlength="10" required autocomplete="new-password" placeholder="Confirm backup password"><button class="button subtle" type="submit"><i data-lucide="download"></i>Download Backup</button></form>
+				<form id="keylinkImportIdentity" class="keylink-identity-form" autocomplete="off"><h3>Restore encrypted backup</h3><input id="keylinkImportFile" type="file" accept="application/json,.json" required><input id="keylinkImportPassword" type="password" required autocomplete="current-password" placeholder="Backup password"><button class="button subtle" type="submit"><i data-lucide="upload"></i>Restore Identity</button></form>
+			</div>
+		</div>
+
+		<div id="keylinkPasteModal" class="modal" role="dialog" aria-modal="true" aria-label="Paste Keylink">
+			<form id="keylinkPasteForm" class="modal-card" autocomplete="off">
+				<h2>Open Keylink</h2>
+				<label for="keylinkPasteInput">Permanent Keylink URI or Secret ID</label>
+				<textarea id="keylinkPasteInput" class="monospace" rows="3" required placeholder="keylink://secret/…"></textarea>
+				<div class="modal-actions"><button class="button secondary" type="button" data-keylink-modal-close="#keylinkPasteModal">Cancel</button><button class="button" type="submit">Resolve</button></div>
+			</form>
+		</div>
+
 		<div id="qrScannerModal" class="modal qr-scanner-modal" role="dialog" aria-modal="true" aria-label="Scan recipient QR code">
 			<div class="modal-card qr-scanner-card">
-				<h2>Scan Recipient QR</h2>
+				<h2 id="qrScannerTitle">Scan Recipient QR</h2>
 				<div class="qr-video-frame">
 					<video id="qrScannerVideo" autoplay muted playsinline></video>
 					<div class="qr-scan-frame" aria-hidden="true"></div>
@@ -761,5 +929,8 @@
 		<script src="lib/bitcoinjs-4.0.3-browser.js"></script>
 		<script src="wallet-vault.js"></script>
 		<script src="sweetwallet.js"></script>
+		<script src="keylink-crypto.js"></script>
+		<script src="keylink-storage.js"></script>
+		<script src="keylink.js"></script>
 	</body>
 </html>

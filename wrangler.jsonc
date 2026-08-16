@@ -2,13 +2,27 @@
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "sweetwallet",
 	"main": "cloudflare-worker.js",
-	"compatibility_date": "2026-07-24",
+	"compatibility_date": "2026-08-15",
 	"compatibility_flags": [
 		"nodejs_compat"
 	],
 	"assets": {
 		"directory": ".",
 		"binding": "ASSETS"
+	},
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "KEYLINK_SECRETS",
+				"class_name": "KeylinkSecret"
+			}
+		]
+	},
+	"exports": {
+		"KeylinkSecret": {
+			"type": "durable-object",
+			"storage": "sqlite"
+		}
 	},
 	"routes": [
 		{

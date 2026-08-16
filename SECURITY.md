@@ -18,3 +18,11 @@ Only the new wallet address is sent to the local server. The generated SweetWall
 ## User Safety
 
 SweetWallet must not fake balances, auto-send funds, or broadcast transactions without explicit user confirmation. Balances and transaction activity should come from live Sugarchain API or explorer data.
+
+## Keylink
+
+- Keylink plaintext and content keys are handled only in browser memory. Plaintext secrets and private X25519 keys are never sent to the relay or placed on Sugarchain.
+- The permanent QR is public and identifies a Secret ID only. Possessing or copying it does not grant ownership or decryption access.
+- Every off-chain state-changing request is signed by the active Sugarchain identity. Every ownership approval also requires an accepted `KLT1` Sugarchain transaction before the relay commits it.
+- Keylink's X25519 identity is separate from the wallet spending key and cannot spend SUGAR. Users should export its password-encrypted backup.
+- A previous owner may remember or copy plaintext they already saw. Keylink only denies future protocol-mediated access after transfer.
