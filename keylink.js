@@ -18,6 +18,7 @@
 		autoapproveInProgress: {},
 		pendingApproval: null,
 		pendingDenial: null,
+		pendingPinDisable: null,
 		receivedSecretId: '',
 		createPin: '',
 		activeSecretId: '',
@@ -806,23 +807,55 @@
 		$('#keylinkQrModal').classList.add('active');
 	}
 
-	async function changePinRequirement(enabled) {
+	function showDisablePinConfirmation(record, control) {
+		if (control) { control.checked = true; }
+		state.pendingPinDisable = { secretId: record.secret_id, replaceReserved: hasReservedRequest(record) };
+		$('#keylinkDisablePinSecret').textContent = short(record.secret_id);
+		$('#keylinkDisablePinModal').classList.add('active');
+		$('#keylinkCancelDisablePin').focus();
+	}
+
+	async function changePinRequirement(enabled, control) {
 		var record = findRecord(state.activeSecretId);
 		if (!record) { return; }
+		if (!enabled) {
+			showDisablePinConfirmation(record, control);
+			return;
+		}
 		try {
-			if (enabled) {
-				var pin = Crypto.generatePin();
-				record = await updatePinPolicy(record, { pinRequired: true, autoapprove: true, replacePin: true, replaceReserved: false, pin: pin });
-				toast('PIN protection enabled. Autoapprove is on by default.');
-			} else {
-				if (!window.confirm('Disable PIN protection and invalidate the active PIN?')) { await openDetail(record.secret_id); return; }
-				record = await updatePinPolicy(record, { pinRequired: false, autoapprove: false, replacePin: false, replaceReserved: hasReservedRequest(record), pin: '' });
-				toast('PIN protection disabled.');
-			}
+			var pin = Crypto.generatePin();
+			record = await updatePinPolicy(record, { pinRequired: true, autoapprove: true, replacePin: true, replaceReserved: false, pin: pin });
+			toast('PIN protection enabled. Autoapprove is on by default.');
 			await openDetail(record.secret_id);
 		} catch (error) {
 			toast(error.message || 'PIN protection could not be updated.', 'danger');
 			await openDetail(record.secret_id);
+		}
+	}
+
+	function closeDisablePinModal() {
+		state.pendingPinDisable = null;
+		closeModal('#keylinkDisablePinModal');
+		if (state.activeSecretId) { openDetail(state.activeSecretId); }
+	}
+
+	async function confirmDisablePin() {
+		if (!state.pendingPinDisable) { return; }
+		var pending = state.pendingPinDisable;
+		var button = $('#keylinkConfirmDisablePin');
+		setBusy(button, true, 'Disabling…');
+		try {
+			var record = findRecord(pending.secretId);
+			if (!record || record.current_owner !== state.ownerId) { throw new Error('Only the current owner can disable this Keylink PIN.'); }
+			record = await updatePinPolicy(record, { pinRequired: false, autoapprove: false, replacePin: false, replaceReserved: pending.replaceReserved, pin: '' });
+			state.pendingPinDisable = null;
+			closeModal('#keylinkDisablePinModal');
+			toast('PIN protection disabled.');
+			await openDetail(record.secret_id);
+		} catch (error) {
+			toast(error.message || 'PIN protection could not be disabled.', 'danger');
+		} finally {
+			setBusy(button, false);
 		}
 	}
 
@@ -988,10 +1021,11 @@
 				$('#keylinkDetailModal').classList.remove('active');
 			}
 			await reloadRecords();
+			showSentNotification(pending.transfer.secret_id, pending.transfer.to);
 			try {
 				var result = await relayRequest('/api/keylink/secrets/' + record.secret_id + '/transfers', { method: 'POST', body: JSON.stringify(record.pending_transfer) });
 				await mergeRemoteState(result.state); await reloadRecords();
-				toast(automatic ? 'Keylink transferred automatically.' : 'Keylink ownership transferred on Sugarchain.');
+				if (!automatic) { toast('Keylink ownership transferred on Sugarchain.'); }
 			} catch (relayError) {
 				toast('Sugarchain accepted the transfer. Keylink will retry relay verification after propagation.', 'warning');
 			}
@@ -1000,6 +1034,14 @@
 			if (!automatic) { toast(error.message || 'Keylink transfer failed.', 'danger'); }
 			throw error;
 		}
+	}
+
+	function showSentNotification(secretId, recipientAddress) {
+		$('#keylinkSentSecret').textContent = short(secretId);
+		$('#keylinkSentAddress').textContent = recipientAddress;
+		$('#keylinkSentModal').classList.add('active');
+		$('#keylinkCloseSent').focus();
+		refreshIcons();
 	}
 
 	async function confirmApproval() {
@@ -1142,7 +1184,7 @@
 			if (deny) { prepareDenial(deny.dataset.keylinkRequestDeny); }
 		});
 		$('#keylinkDetailModal').addEventListener('change', function (event) {
-			if (event.target.matches('[data-keylink-pin-required]')) { changePinRequirement(event.target.checked); }
+			if (event.target.matches('[data-keylink-pin-required]')) { changePinRequirement(event.target.checked, event.target); }
 			if (event.target.matches('[data-keylink-autoapprove]')) { changeAutoapprove(event.target.checked); }
 		});
 		$('#keylinkCopySecret').addEventListener('click', function () { if (state.plainSecret) { Bridge.copyValue(state.plainSecret, 'Secret copied.'); } });
@@ -1153,6 +1195,8 @@
 		$('#keylinkConfirmTransfer').addEventListener('click', confirmApproval);
 		$('#keylinkCancelDeny').addEventListener('click', closeDenyModal);
 		$('#keylinkConfirmDeny').addEventListener('click', denyRequest);
+		$('#keylinkCancelDisablePin').addEventListener('click', closeDisablePinModal);
+		$('#keylinkConfirmDisablePin').addEventListener('click', confirmDisablePin);
 		$('#keylinkDismissReceived').addEventListener('click', function () { closeModal('#keylinkReceivedModal'); });
 		$('#keylinkViewReceived').addEventListener('click', function () {
 			var secretId = state.receivedSecretId;
@@ -1160,6 +1204,7 @@
 			Bridge.switchTab('keylink');
 			window.setTimeout(function () { if (secretId) { openDetail(secretId); } }, 250);
 		});
+		$('#keylinkCloseSent').addEventListener('click', function () { closeModal('#keylinkSentModal'); });
 		$('#keylinkCloseIdentity').addEventListener('click', function () { closeModal('#keylinkIdentityModal'); });
 		$('#keylinkCopyIdentity').addEventListener('click', function () { Bridge.copyValue($('#keylinkIdentityPublic').value, 'Public encryption key copied.'); });
 		$('#keylinkExportIdentity').addEventListener('submit', exportIdentity);
@@ -1167,10 +1212,10 @@
 		$$('[data-keylink-modal-close]').forEach(function (button) { button.addEventListener('click', function () { closeModal(button.dataset.keylinkModalClose); }); });
 		window.addEventListener('sweetwallet:sensitive-cleared', function () {
 			state.identityPair = null; state.identityRecord = null; state.ownerId = ''; state.records = []; state.plainSecret = '';
-			state.pendingApproval = null; state.pendingDenial = null;
+			state.pendingApproval = null; state.pendingDenial = null; state.pendingPinDisable = null;
 			state.autoapproveInProgress = {}; state.receivedSecretId = ''; state.createPin = '';
-			window.clearInterval(state.pollTimer); state.pollTimer = 0; closeSecretModal(); closeModal('#keylinkTransferModal'); closeModal('#keylinkDenyModal');
-			closeModal('#keylinkReceivedModal');
+			window.clearInterval(state.pollTimer); state.pollTimer = 0; closeSecretModal(); closeModal('#keylinkTransferModal'); closeModal('#keylinkDenyModal'); closeModal('#keylinkDisablePinModal');
+			closeModal('#keylinkReceivedModal'); closeModal('#keylinkSentModal');
 		});
 	}
 

@@ -723,6 +723,19 @@
 			</div>
 		</div>
 
+		<div id="keylinkDisablePinModal" class="modal keylink-action-modal" role="dialog" aria-modal="true" aria-labelledby="keylinkDisablePinTitle">
+			<div class="modal-card keylink-confirm-card">
+				<h2 id="keylinkDisablePinTitle">Disable PIN Protection?</h2>
+				<p>The active PIN will be invalidated and future ownership requests will no longer require it.</p>
+				<div class="send-summary active">
+					<div class="summary-line"><span>Secret</span><strong id="keylinkDisablePinSecret"></strong></div>
+					<div class="summary-line"><span>Autoapprove</span><strong>Turned off</strong></div>
+				</div>
+				<div class="notice warning">Any reserved autoapproval will be released. Its ownership request will remain available for manual review.</div>
+				<div class="modal-actions"><button id="keylinkCancelDisablePin" class="button secondary" type="button">Keep PIN</button><button id="keylinkConfirmDisablePin" class="button danger" type="button">DISABLE PIN</button></div>
+			</div>
+		</div>
+
 		<div id="keylinkReceivedModal" class="modal keylink-action-modal" role="dialog" aria-modal="true" aria-labelledby="keylinkReceivedTitle">
 			<div class="modal-card keylink-confirm-card">
 				<h2 id="keylinkReceivedTitle">Keylink Received</h2>
@@ -730,6 +743,19 @@
 				<div id="keylinkReceivedSecret" class="keylink-readonly break-anywhere"></div>
 				<div class="notice">Open the Keylink details, then use View Secret when you are ready. Plaintext is never revealed automatically.</div>
 				<div class="modal-actions"><button id="keylinkDismissReceived" class="button secondary" type="button">Later</button><button id="keylinkViewReceived" class="button" type="button"><i data-lucide="eye"></i>View Secret</button></div>
+			</div>
+		</div>
+
+		<div id="keylinkSentModal" class="modal keylink-action-modal" role="dialog" aria-modal="true" aria-labelledby="keylinkSentTitle">
+			<div class="modal-card keylink-confirm-card">
+				<h2 id="keylinkSentTitle">Keylink Sent</h2>
+				<p>You sent a secret.</p>
+				<div class="send-summary active">
+					<div class="summary-line"><span>Secret</span><strong id="keylinkSentSecret"></strong></div>
+					<div class="summary-line"><span>Sugarchain address</span><strong id="keylinkSentAddress" class="break-anywhere"></strong></div>
+				</div>
+				<div class="notice">The ownership transfer was accepted by Sugarchain. This wallet is no longer authorized to reveal the secret.</div>
+				<div class="modal-actions keylink-single-action"><button id="keylinkCloseSent" class="button" type="button">Done</button></div>
 			</div>
 		</div>
 

@@ -765,6 +765,10 @@
 	line-height: 1.5;
 }
 
+.keylink-single-action .button {
+	grid-column: 1 / -1;
+}
+
 .keylink-identity-card {
 	padding: 18px !important;
 	overflow-y: auto !important;

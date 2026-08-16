@@ -190,6 +190,12 @@ test('Keylink UI exposes opt-in PIN controls and keeps autoapproval state-bound'
 	assert.match(client, /PIN_AUTOAPPROVE_ADVANCE_AUTHORIZATION/);
 	assert.match(client, /request\.pin_verified === true && request\.autoapprove_reserved === true/);
 	assert.match(client, /navigator\.onLine === false/);
+	assert.match(html, /id="keylinkDisablePinModal"/);
+	assert.match(html, /id="keylinkSentModal"/);
+	assert.match(html, /id="keylinkSentAddress"/);
+	assert.doesNotMatch(client, /window\.confirm\('Disable PIN protection and invalidate the active PIN\?'\)/);
+	assert.match(client, /showSentNotification\(pending\.transfer\.secret_id, pending\.transfer\.to\)/);
+	assert.doesNotMatch(client, /Keylink transferred automatically\./);
 });
 
 test('secret length is capped at 300 characters', async () => {

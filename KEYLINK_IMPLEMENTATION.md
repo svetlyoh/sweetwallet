@@ -315,8 +315,10 @@ Important limitations:
 - Toasts use a higher stacking layer than all modals, so action errors remain visible.
 - View and Approve buttons show busy text while cryptographic and relay preparation runs.
 - Approve and Deny both use consistent in-app confirmation dialogs.
+- Disabling PIN protection uses a wallet-native confirmation dialog; cancelling restores the enabled switch without changing relay policy.
 - PIN creation displays the generated value with Copy and Regenerate controls, while its QR contains only `?pin=1`.
 - A correct PIN request receives a PIN Verified indicator. An ownership recipient gets a direct NEW notification but must explicitly open View Secret.
+- A successful manual or automatic transfer opens a Keylink Sent dialog with the full recipient Sugarchain address. This replaces the old automatic-transfer toast.
 - Autoapproval status and its online/unlocked/funding requirements remain visible in the owner detail view.
 - Buttons and sheets remain touch-friendly for mobile Safari while also supporting desktop Edge.
 
