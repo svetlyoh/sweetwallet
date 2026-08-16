@@ -825,7 +825,6 @@
 		try {
 			var pin = Crypto.generatePin();
 			record = await updatePinPolicy(record, { pinRequired: true, autoapprove: true, replacePin: true, replaceReserved: false, pin: pin });
-			toast('PIN protection enabled. Autoapprove is on by default.');
 			await openDetail(record.secret_id);
 		} catch (error) {
 			toast(error.message || 'PIN protection could not be updated.', 'danger');
@@ -850,7 +849,6 @@
 			record = await updatePinPolicy(record, { pinRequired: false, autoapprove: false, replacePin: false, replaceReserved: pending.replaceReserved, pin: '' });
 			state.pendingPinDisable = null;
 			closeModal('#keylinkDisablePinModal');
-			toast('PIN protection disabled.');
 			await openDetail(record.secret_id);
 		} catch (error) {
 			toast(error.message || 'PIN protection could not be disabled.', 'danger');
