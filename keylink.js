@@ -15,8 +15,11 @@
 		query: '',
 		pollTimer: 0,
 		polling: false,
+		autoapproveInProgress: {},
 		pendingApproval: null,
 		pendingDenial: null,
+		receivedSecretId: '',
+		createPin: '',
 		activeSecretId: '',
 		plainSecret: ''
 	};
@@ -183,6 +186,52 @@
 		return Crypto.bytesToHex(crypto.getRandomValues(new Uint8Array(16)));
 	}
 
+	function hasReservedRequest(record) {
+		return incomingRequests(record).some(function (request) { return request.autoapprove_reserved === true; });
+	}
+
+	async function pinForRecord(record) {
+		if (!record || record.current_owner !== state.ownerId || !record.local_pin_envelope) { return ''; }
+		await ensureIdentity();
+		return Crypto.revealLocalPin(record.local_pin_envelope, state.identityPair, record.secret_id, state.ownerId, record.state_version);
+	}
+
+	async function protectPinForRecord(record, pin) {
+		await ensureIdentity();
+		record.local_pin_envelope = await Crypto.protectLocalPin(pin, state.identityPair, record.secret_id, state.ownerId, record.state_version);
+	}
+
+	function registrationRequestBody(registration, pin) {
+		return registration.pin_required ? { registration: registration, pin: pin } : registration;
+	}
+
+	async function updatePinPolicy(record, options) {
+		var context = walletContext();
+		if (!record || record.current_owner !== context.address) { throw new Error('Only the current owner can change this Keylink PIN.'); }
+		var pinRequired = options.pinRequired === true;
+		var update = await signRecord({
+			protocol: Crypto.PROTOCOL, type: 'pin_policy_update', secret_id: record.secret_id,
+			owner_id: context.address, owner_public_key: context.publicKey.toLowerCase(),
+			state_version: Number(record.state_version), pin_required: pinRequired,
+			autoapprove_enabled: pinRequired && options.autoapprove === true,
+			replace_pin: pinRequired && options.replacePin === true,
+			replace_reserved: options.replaceReserved === true,
+			nonce: randomHex(), created_at: new Date().toISOString()
+		});
+		var result = await relayRequest('/api/keylink/secrets/' + record.secret_id + '/pin-policy', {
+			method: 'POST', body: JSON.stringify({ update: update, pin: pinRequired && options.replacePin ? options.pin : '' })
+		});
+		record.pin_required = pinRequired;
+		record.autoapprove_enabled = pinRequired && options.autoapprove === true;
+		record.pin_setup_required = false;
+		if (pinRequired && options.replacePin) { await protectPinForRecord(record, options.pin); }
+		if (!pinRequired) { record.local_pin_envelope = null; }
+		await putRecord(record);
+		await mergeRemoteState(result.state);
+		await reloadRecords();
+		return findRecord(record.secret_id);
+	}
+
 	async function signRecord(record) {
 		return Object.assign({}, record, { signature: await Bridge.signRecord(record) });
 	}
@@ -300,7 +349,7 @@
 			var time = relativeTime(new Date(recordActivity(record)).toISOString());
 			return '<button type="button" class="keylink-row status-' + status.key + '" data-keylink-secret="' + escapeHtml(record.secret_id) + '">' +
 				'<span class="keylink-status-icon"><i data-lucide="' + status.icon + '"></i></span>' +
-				'<span class="keylink-row-main"><span class="keylink-row-id">' + escapeHtml(short(record.secret_id)) + '</span>' +
+				'<span class="keylink-row-main"><span class="keylink-row-id">' + escapeHtml(short(record.secret_id)) + (record.unread_received ? '<span class="keylink-new-badge">NEW</span>' : '') + '</span>' +
 				'<span class="keylink-row-label">' + escapeHtml(record.label || status.detail) + '</span>' +
 				'<span class="keylink-row-meta"><strong>' + escapeHtml(status.label) + '</strong><span>' + escapeHtml(time) + '</span></span></span>' +
 				'<i class="keylink-row-chevron" data-lucide="chevron-right"></i></button>';
@@ -335,7 +384,10 @@
 			await putRecord(record);
 			return record;
 		}
+		var previousOwner = record.current_owner;
+		var previousVersion = Number(record.state_version || 0);
 		var wasOwner = record.current_owner === state.ownerId || record.relationship === 'created' || record.relationship === 'obtained';
+		var becameOwner = !!previousOwner && previousOwner !== state.ownerId && remote.current_owner === state.ownerId;
 		record.created_by = remote.created_by;
 		record.current_owner = remote.current_owner;
 		record.state_version = remote.state_version;
@@ -343,26 +395,50 @@
 		record.transfers = remote.transfers || [];
 		record.latest_transfer_txid = remote.latest_transfer_txid || record.latest_transfer_txid || null;
 		record.updated_at = remote.updated_at || new Date().toISOString();
+		record.pin_required = remote.pin_required === true;
+		record.pin_setup_required = remote.pin_setup_required === true;
 		if (remote.current_owner === state.ownerId) {
 			record.encrypted_secret = remote.encrypted_secret;
 			record.owner_envelope = remote.owner_envelope;
 			record.relationship = remote.created_by === state.ownerId && Number(remote.state_version) === 1 ? 'created' : 'obtained';
 			record.pending_transfer = null;
+			if (becameOwner) {
+				record.unread_received = true;
+				record.needs_pin_setup = remote.pin_required === true && remote.pin_setup_required === true;
+				record.autoapprove_enabled = record.needs_pin_setup;
+				record.local_pin_envelope = null;
+			}
+			if (remote.pin_required === true && remote.pin_setup_required === true && !record.local_pin_envelope && Number(remote.state_version) > 1) {
+				record.needs_pin_setup = true;
+				record.autoapprove_enabled = true;
+			}
+			if (previousVersion && previousVersion !== Number(remote.state_version) && !becameOwner) {
+				record.local_pin_envelope = null;
+			}
 		} else if (wasOwner || record.pending_transfer) {
 			record.relationship = 'transferred';
 			record.transferred_to = remote.current_owner;
 			record.owner_envelope = null;
 			record.encrypted_secret = null;
 			record.pending_transfer = null;
+			record.local_pin_envelope = null;
+			record.autoapprove_enabled = false;
+			record.unread_received = false;
 		}
 		await putRecord(record);
+		if (becameOwner && record.received_notified_version !== Number(remote.state_version)) {
+			record.received_notified_version = Number(remote.state_version);
+			await putRecord(record);
+			showReceivedNotification(record);
+		}
 		return record;
 	}
 
 	async function retryRecord(record) {
 		if (record.pending_registration) {
 			try {
-				var registrationResult = await relayRequest('/api/keylink/secrets', { method: 'POST', body: JSON.stringify(record.pending_registration) });
+				var registrationPin = record.pending_registration.pin_required ? await pinForRecord(record) : '';
+				var registrationResult = await relayRequest('/api/keylink/secrets', { method: 'POST', body: JSON.stringify(registrationRequestBody(record.pending_registration, registrationPin)) });
 				record.pending_registration = null;
 				await putRecord(record);
 				await mergeRemoteState(registrationResult.state);
@@ -409,6 +485,9 @@
 				}
 			}
 			await reloadRecords();
+			for (var candidateIndex = 0; candidateIndex < state.records.length; candidateIndex += 1) {
+				await attemptAutoapprove(state.records[candidateIndex]);
+			}
 		} catch (error) {
 			if (showErrors) { toast(error.message || 'Keylink synchronization failed.', 'danger'); }
 		} finally {
@@ -421,9 +500,12 @@
 		var button = $('#keylinkCreateSubmit');
 		var secretInput = $('#keylinkSecretInput');
 		var labelInput = $('#keylinkLabelInput');
+		var pinRequired = $('#keylinkRequirePin').checked;
+		var autoapproveEnabled = pinRequired && $('#keylinkCreateAutoapprove').checked;
 		setBusy(button, true, 'Encrypting…');
 		var encrypted;
 		try {
+			if (pinRequired && !/^\d{6}$/.test(state.createPin)) { throw new Error('Generate a 6-digit Keylink PIN before creating the secret.'); }
 			var context = walletContext();
 			var identity = await ensureIdentity();
 			encrypted = await Crypto.encryptSecret(secretInput.value);
@@ -439,6 +521,8 @@
 				encrypted_secret: encrypted.encryptedSecret,
 				owner_envelope: ownerEnvelope,
 				state_version: 1,
+				pin_required: pinRequired,
+				autoapprove_enabled: autoapproveEnabled,
 				nonce: randomHex(),
 				created_at: new Date().toISOString()
 			});
@@ -448,16 +532,19 @@
 				created_by: context.address, current_owner: context.address, relationship: 'created',
 				encrypted_secret: registration.encrypted_secret, owner_envelope: registration.owner_envelope,
 				state_version: 1, requests: [], pending_registration: registration,
+				pin_required: pinRequired, autoapprove_enabled: autoapproveEnabled, pin_setup_required: false,
 				created_at: registration.created_at, updated_at: registration.created_at
 			};
+			if (pinRequired) { await protectPinForRecord(record, state.createPin); }
 			await putRecord(record);
 			secretInput.value = '';
 			labelInput.value = '';
 			$('#keylinkSecretCount').textContent = '0 / 300';
+			setCreatePinEnabled(false);
 			showLibraryView();
 			await reloadRecords();
 			try {
-				var result = await relayRequest('/api/keylink/secrets', { method: 'POST', body: JSON.stringify(registration) });
+				var result = await relayRequest('/api/keylink/secrets', { method: 'POST', body: JSON.stringify(registrationRequestBody(registration, pinRequired ? await pinForRecord(record) : '')) });
 				record.pending_registration = null;
 				await putRecord(record);
 				await mergeRemoteState(result.state);
@@ -476,6 +563,7 @@
 	}
 
 	function showCreateView() {
+		setCreatePinEnabled(false);
 		$('#keylinkLibraryView').classList.add('hidden');
 		$('#keylinkCreateView').classList.remove('hidden');
 		$('#keylinkSecretInput').focus();
@@ -484,6 +572,20 @@
 	function showLibraryView() {
 		$('#keylinkCreateView').classList.add('hidden');
 		$('#keylinkLibraryView').classList.remove('hidden');
+	}
+
+	function setCreatePinEnabled(enabled) {
+		var requirePin = $('#keylinkRequirePin');
+		var options = $('#keylinkCreatePinOptions');
+		var autoapprove = $('#keylinkCreateAutoapprove');
+		if (!requirePin || !options || !autoapprove) { return; }
+		requirePin.checked = enabled;
+		options.classList.toggle('hidden', !enabled);
+		autoapprove.disabled = !enabled;
+		autoapprove.checked = enabled;
+		state.createPin = enabled ? Crypto.generatePin() : '';
+		$('#keylinkCreatePinValue').textContent = state.createPin;
+		refreshIcons();
 	}
 
 	async function resolveSecret(secretId) {
@@ -522,7 +624,8 @@
 		state.activeSecretId = remote.secret_id;
 		$('#keylinkDetailTitle').textContent = 'Keylink';
 		$('#keylinkDetailBody').innerHTML = '<div class="keylink-detail-hero"><span class="keylink-detail-icon"><i data-lucide="scan-qr-code"></i></span><code>' + escapeHtml(short(remote.secret_id)) + '</code><h3>This secret belongs to another owner.</h3></div>' +
-			'<dl class="keylink-detail-grid"><div><dt>Current owner</dt><dd class="break-anywhere">' + escapeHtml(remote.current_owner) + '</dd></div><div><dt>Permanent QR</dt><dd>' + escapeHtml(Crypto.createSecretUri(remote.secret_id)) + '</dd></div></dl>' +
+			'<dl class="keylink-detail-grid"><div><dt>Current owner</dt><dd class="break-anywhere">' + escapeHtml(remote.current_owner) + '</dd></div><div><dt>Permanent QR</dt><dd>' + escapeHtml(Crypto.createSecretUri(remote.secret_id, remote.pin_required === true)) + '</dd></div></dl>' +
+			(remote.pin_required ? '<div class="notice"><strong>This Keylink requires a PIN.</strong> Enter the separately shared 6-digit PIN when requesting ownership.</div><label class="keylink-request-pin" for="keylinkRequestPin"><span>Ownership PIN</span><input id="keylinkRequestPin" type="password" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" autocomplete="one-time-code" placeholder="••••••"></label>' : '') +
 			'<div class="notice">QR possession is not ownership. The secret remains encrypted for the current owner.</div>';
 		$('#keylinkDetailActions').innerHTML = '<button class="button" type="button" data-keylink-detail-action="request"><i data-lucide="hand"></i>Request Ownership</button><button class="button secondary" type="button" data-keylink-detail-action="close">Close</button>';
 		$('#keylinkDetailModal').classList.add('active');
@@ -539,28 +642,35 @@
 			if (remote.current_owner === context.address) {
 				await mergeRemoteState(remote); await reloadRecords(); openDetail(remote.secret_id); return;
 			}
+			var pin = remote.pin_required ? String($('#keylinkRequestPin') && $('#keylinkRequestPin').value || '') : '';
+			if (remote.pin_required && !/^\d{6}$/.test(pin)) { throw new Error('Enter the 6-digit PIN shared by the current owner.'); }
 			var ownershipRequest = await signRecord({
 				protocol: Crypto.PROTOCOL, type: 'ownership_request', request_id: randomHex(), secret_id: remote.secret_id,
 				current_owner_id: remote.current_owner, requester_id: context.address,
 				requester_public_key: context.publicKey.toLowerCase(), requester_encryption_key: identity.public_key,
-				nonce: randomHex(), created_at: new Date().toISOString()
+				state_version: Number(remote.state_version), nonce: randomHex(), created_at: new Date().toISOString()
 			});
 			var record = findRecord(remote.secret_id) || { local_id: localId(remote.secret_id), owner_id: state.ownerId, protocol: Crypto.PROTOCOL, secret_id: remote.secret_id, label: '', created_at: remote.created_at };
 			record.created_by = remote.created_by;
 			record.current_owner = remote.current_owner;
 			record.state_version = remote.state_version;
+			record.pin_required = remote.pin_required === true;
 			record.relationship = 'pending_outgoing';
 			record.outgoing_request_id = ownershipRequest.request_id;
-			record.pending_request = ownershipRequest;
+			record.pending_request = remote.pin_required ? null : ownershipRequest;
+			record.request_submitted_at = ownershipRequest.created_at;
 			record.requests = (remote.requests || []).concat([Object.assign({}, ownershipRequest, { status: 'pending', updated_at: ownershipRequest.created_at })]);
 			record.updated_at = ownershipRequest.created_at;
 			await putRecord(record);
 			$('#keylinkDetailModal').classList.remove('active');
 			await reloadRecords();
 			try {
-				var result = await relayRequest('/api/keylink/secrets/' + remote.secret_id + '/requests', { method: 'POST', body: JSON.stringify(ownershipRequest) });
-				record.pending_request = null; await putRecord(record); await mergeRemoteState(result.state); await reloadRecords();
-				toast('Ownership request sent.');
+				var requestBody = remote.pin_required ? { request: ownershipRequest, pin: pin } : ownershipRequest;
+				var result = await relayRequest('/api/keylink/secrets/' + remote.secret_id + '/requests', { method: 'POST', body: JSON.stringify(requestBody) });
+				record.pending_request = null; await putRecord(record);
+				if (result.state) { await mergeRemoteState(result.state); }
+				await reloadRecords();
+				toast(remote.pin_required ? 'Request received. Waiting for the owner.' : 'Ownership request sent.');
 			} catch (relayError) {
 				toast('Request saved locally and will retry when the relay is available.', 'warning');
 			}
@@ -577,6 +687,34 @@
 		}).join('') || '<a class="keylink-history-row" href="' + escapeHtml(Bridge.explorerTx(record.latest_transfer_txid)) + '" target="_blank" rel="noopener">View latest ownership transaction</a>';
 	}
 
+	async function setupFreshOwnerPin(record) {
+		var pin = Crypto.generatePin();
+		var updated = await updatePinPolicy(record, {
+			pinRequired: true, autoapprove: true, replacePin: true, replaceReserved: false, pin: pin
+		});
+		updated.needs_pin_setup = false;
+		updated.pin_setup_required = false;
+		await putRecord(updated);
+		toast('A fresh ownership PIN was generated for this Keylink.');
+		return updated;
+	}
+
+	function ownerPinHtml(record, pin) {
+		if (record.current_owner !== state.ownerId) { return ''; }
+		var pinRequired = record.pin_required === true;
+		return '<section class="keylink-owner-pin-panel"><label class="keylink-switch-row"><span><strong>Require PIN</strong><small>Gate ownership requests for this ownership state.</small></span><input type="checkbox" data-keylink-pin-required ' + (pinRequired ? 'checked' : '') + '></label>' +
+			(pinRequired ? '<div class="keylink-pin-display"><span>PIN</span><output>' + escapeHtml(pin || 'Unavailable') + '</output></div><div class="keylink-pin-buttons"><button class="button subtle" type="button" data-keylink-pin-action="copy" ' + (pin ? '' : 'disabled') + '><i data-lucide="copy"></i>Copy PIN</button><button class="button subtle" type="button" data-keylink-pin-action="regenerate"><i data-lucide="refresh-cw"></i>Regenerate</button></div><label class="keylink-switch-row"><span><strong>Autoapprove valid PIN request</strong></span><input type="checkbox" data-keylink-autoapprove ' + (record.autoapprove_enabled ? 'checked' : '') + '></label><p class="keylink-pin-note">Autoapprove only works while this wallet is online and unlocked.</p>' +
+			(record.pin_setup_required ? '<div class="notice warning">Set up access PIN to accept protected ownership requests. Secret viewing remains available.</div>' : '') : '<p class="keylink-pin-note">Enable PIN protection to generate a fresh secure 6-digit PIN. Autoapprove will start ON.</p>') + '</section>';
+	}
+
+	function showReceivedNotification(record) {
+		if (!$('#keylinkReceivedModal')) { return; }
+		state.receivedSecretId = record.secret_id;
+		$('#keylinkReceivedSecret').textContent = short(record.secret_id, 8, 8);
+		$('#keylinkReceivedModal').classList.add('active');
+		refreshIcons();
+	}
+
 	async function openDetail(secretId) {
 		var record = findRecord(secretId);
 		if (!record) { return; }
@@ -590,24 +728,39 @@
 		} catch (error) {
 			// Local details remain available while the relay is temporarily offline.
 		}
+		if (record.current_owner === state.ownerId && record.needs_pin_setup && record.pin_setup_required) {
+			try { record = await setupFreshOwnerPin(record); }
+			catch (pinSetupError) { toast('PIN setup will retry when the relay is available.', 'warning'); }
+		}
+		if (record.unread_received) {
+			record.unread_received = false;
+			await putRecord(record);
+			renderLibrary();
+		}
+		var activePin = '';
+		if (record.current_owner === state.ownerId && record.pin_required) {
+			try { activePin = await pinForRecord(record); } catch (pinError) { activePin = ''; }
+		}
 		var status = primaryStatus(record);
 		var incoming = incomingRequests(record);
 		var outgoing = outgoingRequest(record);
 		var owner = record.current_owner === state.ownerId ? 'You' : record.current_owner;
 		var provenance = record.created_by === state.ownerId ? 'Created by you' : (record.current_owner === state.ownerId ? 'Obtained' : 'Previously owned');
 		var requestsHtml = incoming.length ? '<section class="keylink-requests"><h3>Ownership Requests</h3>' + incoming.map(function (request) {
-			return '<article class="keylink-request-card"><div><strong>' + escapeHtml(short(request.requester_id, 12, 8)) + '</strong><small>Requested ' + escapeHtml(relativeTime(request.created_at)) + '</small></div><button class="copy-button" type="button" data-copy-value="' + escapeHtml(request.requester_id) + '" aria-label="Copy requester address"><i data-lucide="copy"></i></button><div class="keylink-request-actions"><button class="button" type="button" data-keylink-request-approve="' + request.request_id + '">Approve</button><button class="button danger" type="button" data-keylink-request-deny="' + request.request_id + '">Deny</button></div></article>';
+			return '<article class="keylink-request-card"><div><strong>' + escapeHtml(short(request.requester_id, 12, 8)) + '</strong><small>Requested ' + escapeHtml(relativeTime(request.created_at)) + '</small>' + (request.pin_verified ? '<span class="keylink-pin-verified"><i data-lucide="badge-check"></i>PIN Verified</span>' : '') + '</div><button class="copy-button" type="button" data-copy-value="' + escapeHtml(request.requester_id) + '" aria-label="Copy requester address"><i data-lucide="copy"></i></button><div class="keylink-request-actions"><button class="button" type="button" data-keylink-request-approve="' + request.request_id + '">Approve</button><button class="button danger" type="button" data-keylink-request-deny="' + request.request_id + '">Deny</button></div></article>';
 		}).join('') + '</section>' : '';
-		var outgoingHtml = outgoing ? '<div class="notice ' + (outgoing.status === 'denied' ? 'danger' : '') + '"><strong>' + escapeHtml(outgoing.status === 'denied' ? 'Request Denied' : 'Waiting for approval') + '</strong><br>Current owner: ' + escapeHtml(short(record.current_owner, 12, 8)) + '</div>' : '';
+		var noResponse = !outgoing && record.relationship === 'pending_outgoing' && Date.now() - Date.parse(record.request_submitted_at || 0) > 120000;
+		var outgoingHtml = outgoing ? '<div class="notice ' + (outgoing.status === 'denied' ? 'danger' : '') + '"><strong>' + escapeHtml(outgoing.status === 'denied' ? 'Request Denied' : 'Waiting for approval') + '</strong><br>Current owner: ' + escapeHtml(short(record.current_owner, 12, 8)) + '</div>' : (noResponse ? '<div class="notice warning"><strong>No response received.</strong><br>You may try the ownership request again.</div>' : '');
 		$('#keylinkDetailTitle').textContent = 'Keylink Secret';
 		$('#keylinkDetailBody').innerHTML = '<div class="keylink-detail-hero"><span class="keylink-detail-icon status-' + status.key + '"><i data-lucide="' + status.icon + '"></i></span><code>' + escapeHtml(short(record.secret_id)) + '</code><h3>' + escapeHtml(status.label) + '</h3><p>' + escapeHtml(status.detail) + '</p></div>' +
 			'<dl class="keylink-detail-grid"><div><dt>Secret ID</dt><dd class="break-anywhere">' + escapeHtml(record.secret_id) + '</dd></div><div><dt>Current owner</dt><dd class="break-anywhere">' + escapeHtml(owner) + '</dd></div><div><dt>Origin</dt><dd>' + escapeHtml(provenance) + '</dd></div><div><dt>State version</dt><dd>' + Number(record.state_version || 1) + '</dd></div></dl>' +
-			(record.current_owner !== state.ownerId && status.key === 'transferred' ? '<div class="notice warning">Ownership transferred. This Keylink identity is no longer authorized to reveal this secret.</div>' : '') + outgoingHtml + requestsHtml +
+			(record.current_owner !== state.ownerId && status.key === 'transferred' ? '<div class="notice warning">Ownership transferred. This Keylink identity is no longer authorized to reveal this secret.</div>' : '') + outgoingHtml + ownerPinHtml(record, activePin) + requestsHtml +
 			'<section class="keylink-history"><h3>Blockchain History</h3>' + historyHtml(record) + '</section>';
 		var actions = [];
 		if (record.current_owner === state.ownerId && record.encrypted_secret && record.owner_envelope) { actions.push('<button class="button" type="button" data-keylink-detail-action="view"><i data-lucide="eye"></i>View Secret</button>'); }
 		actions.push('<button class="button subtle" type="button" data-keylink-detail-action="qr"><i data-lucide="qr-code"></i>Show QR</button>');
 		if (outgoing && outgoing.status === 'pending') { actions.push('<button class="button danger" type="button" data-keylink-detail-action="cancel-request"><i data-lucide="x"></i>Cancel Request</button>'); }
+		if (noResponse) { actions.push('<button class="button" type="button" data-keylink-detail-action="try-request"><i data-lucide="refresh-cw"></i>Try Again</button>'); }
 		actions.push('<button class="button secondary" type="button" data-keylink-detail-action="close">Close</button>');
 		$('#keylinkDetailActions').innerHTML = actions.join('');
 		$('#keylinkDetailModal').classList.add('active');
@@ -641,7 +794,7 @@
 	function showQr() {
 		var record = findRecord(state.activeSecretId);
 		if (!record) { return; }
-		var uri = Crypto.createSecretUri(record.secret_id);
+		var uri = Crypto.createSecretUri(record.secret_id, record.pin_required === true);
 		var target = $('#keylinkQrCode');
 		target.innerHTML = '';
 		if (window.jQuery && window.jQuery.fn && window.jQuery.fn.qrcode) {
@@ -651,6 +804,64 @@
 		$('#keylinkQrOwner').textContent = record.current_owner === state.ownerId ? 'You' : short(record.current_owner, 12, 8);
 		$('#keylinkQrUri').value = uri;
 		$('#keylinkQrModal').classList.add('active');
+	}
+
+	async function changePinRequirement(enabled) {
+		var record = findRecord(state.activeSecretId);
+		if (!record) { return; }
+		try {
+			if (enabled) {
+				var pin = Crypto.generatePin();
+				record = await updatePinPolicy(record, { pinRequired: true, autoapprove: true, replacePin: true, replaceReserved: false, pin: pin });
+				toast('PIN protection enabled. Autoapprove is on by default.');
+			} else {
+				if (!window.confirm('Disable PIN protection and invalidate the active PIN?')) { await openDetail(record.secret_id); return; }
+				record = await updatePinPolicy(record, { pinRequired: false, autoapprove: false, replacePin: false, replaceReserved: hasReservedRequest(record), pin: '' });
+				toast('PIN protection disabled.');
+			}
+			await openDetail(record.secret_id);
+		} catch (error) {
+			toast(error.message || 'PIN protection could not be updated.', 'danger');
+			await openDetail(record.secret_id);
+		}
+	}
+
+	async function regeneratePin() {
+		var record = findRecord(state.activeSecretId);
+		if (!record || record.current_owner !== state.ownerId) { return; }
+		var replaceReserved = hasReservedRequest(record);
+		if (replaceReserved && !window.confirm('A verified ownership request is reserved. Regenerate the PIN and release that reservation?')) { return; }
+		try {
+			var pin = Crypto.generatePin();
+			record = await updatePinPolicy(record, {
+				pinRequired: true, autoapprove: record.autoapprove_enabled === true,
+				replacePin: true, replaceReserved: replaceReserved, pin: pin
+			});
+			toast('A fresh Keylink PIN is now active.');
+			await openDetail(record.secret_id);
+		} catch (error) { toast(error.message || 'PIN could not be regenerated.', 'danger'); }
+	}
+
+	async function changeAutoapprove(enabled) {
+		var record = findRecord(state.activeSecretId);
+		if (!record || !record.pin_required) { return; }
+		try {
+			record = await updatePinPolicy(record, { pinRequired: true, autoapprove: enabled, replacePin: false, replaceReserved: false, pin: '' });
+			toast(enabled ? 'Autoapprove enabled while this wallet is online and unlocked.' : 'Autoapprove disabled. PIN requests now require manual approval.');
+			await openDetail(record.secret_id);
+		} catch (error) {
+			toast(error.message || 'Autoapprove could not be updated.', 'danger');
+			await openDetail(record.secret_id);
+		}
+	}
+
+	async function copyActivePin() {
+		var record = findRecord(state.activeSecretId);
+		try {
+			var pin = await pinForRecord(record);
+			if (!pin) { throw new Error('The active PIN is unavailable on this device. Regenerate it first.'); }
+			Bridge.copyValue(pin, 'Keylink PIN copied.');
+		} catch (error) { toast(error.message || 'PIN could not be copied.', 'danger'); }
 	}
 
 	function prepareDenial(requestId) {
@@ -711,27 +922,37 @@
 		} catch (error) { toast(error.message || 'Request could not be cancelled.', 'danger'); }
 	}
 
+	async function prepareOwnershipTransfer(remote, request, automatic) {
+		var context = walletContext();
+		await ensureIdentity();
+		if (remote.current_owner !== context.address) { throw new Error('You are no longer the current owner of this Keylink.'); }
+		if (!request || request.status !== 'pending') { throw new Error('This ownership request is no longer pending.'); }
+		if (automatic && (!remote.pin_required || !request.pin_verified || !request.autoapprove_reserved || Number(request.request_state_version) !== Number(remote.state_version))) {
+			throw new Error('This request is not eligible for Keylink autoapproval.');
+		}
+		var envelope = await Crypto.rewrapOwnerEnvelope(remote.owner_envelope, state.identityPair, request.requester_encryption_key, request.requester_id, Number(remote.state_version) + 1);
+		var authorization = automatic ?
+			{ policy: 'PIN_AUTOAPPROVE_ADVANCE_AUTHORIZATION', provider: 'LocalWalletPinAutoapproveProvider', decision: 'approved' } :
+			{ policy: 'CURRENT_OWNER_MANUAL_APPROVAL', provider: 'ManualOwnerApprovalProvider', decision: 'approved' };
+		var transfer = await signRecord({
+			protocol: Crypto.PROTOCOL, type: 'ownership_transfer', secret_id: remote.secret_id,
+			from: context.address, to: request.requester_id, request_id: request.request_id,
+			previous_state_version: Number(remote.state_version), new_state_version: Number(remote.state_version) + 1,
+			timestamp: new Date().toISOString(), nonce: randomHex(), authorization: authorization,
+			owner_public_key: context.publicKey.toLowerCase(), new_owner_envelope: envelope
+		});
+		return { remote: remote, request: request, transfer: transfer, klt1: await Crypto.createKlt1Hex(transfer), automatic: automatic === true };
+	}
+
 	async function prepareApproval(requestId, button) {
 		setBusy(button, true, 'Preparing…');
 		try {
 			var context = walletContext();
-			await ensureIdentity();
 			var remote = await resolveSecret(state.activeSecretId);
-			if (remote.current_owner !== context.address) { throw new Error('You are no longer the current owner of this Keylink.'); }
 			var request = requestForId({ requests: remote.requests }, requestId);
-			if (!request || request.status !== 'pending') { throw new Error('This ownership request is no longer pending.'); }
-			var envelope = await Crypto.rewrapOwnerEnvelope(remote.owner_envelope, state.identityPair, request.requester_encryption_key, request.requester_id, Number(remote.state_version) + 1);
-			var transfer = await signRecord({
-				protocol: Crypto.PROTOCOL, type: 'ownership_transfer', secret_id: remote.secret_id,
-				from: context.address, to: request.requester_id, request_id: request.request_id,
-				previous_state_version: Number(remote.state_version), new_state_version: Number(remote.state_version) + 1,
-				timestamp: new Date().toISOString(), nonce: randomHex(),
-				authorization: { policy: 'CURRENT_OWNER_MANUAL_APPROVAL', provider: 'ManualOwnerApprovalProvider', decision: 'approved' },
-				owner_public_key: context.publicKey.toLowerCase(), new_owner_envelope: envelope
-			});
-			state.pendingApproval = { remote: remote, request: request, transfer: transfer, klt1: await Crypto.createKlt1Hex(transfer) };
+			state.pendingApproval = await prepareOwnershipTransfer(remote, request, false);
 			$('#keylinkTransferSecret').textContent = short(remote.secret_id);
-			$('#keylinkTransferFrom').textContent = context.address;
+			$('#keylinkTransferFrom').textContent = remote.current_owner;
 			$('#keylinkTransferTo').textContent = request.requester_id;
 			$('#keylinkTransferFee').textContent = context.feeSugar + ' SUGAR';
 			$('#keylinkTransferModal').classList.add('active');
@@ -743,13 +964,9 @@
 		}
 	}
 
-	async function confirmApproval() {
-		var button = $('#keylinkConfirmTransfer');
-		if (!state.pendingApproval) { return; }
-		setBusy(button, true, 'Signing & broadcasting…');
-		var pending = state.pendingApproval;
+	async function executeOwnershipTransfer(pending, automatic) {
 		try {
-			var broadcast = await Bridge.broadcastKeylinkTransfer(pending.klt1);
+			var broadcast = await Bridge.broadcastKeylinkTransfer(pending.klt1, { skipReauthentication: automatic === true });
 			var record = findRecord(pending.transfer.secret_id);
 			record.relationship = 'transferred';
 			record.current_owner = pending.transfer.to;
@@ -758,22 +975,83 @@
 			record.latest_transfer_txid = broadcast.txid;
 			record.encrypted_secret = null;
 			record.owner_envelope = null;
+			record.local_pin_envelope = null;
+			record.pin_required = false;
+			record.pin_setup_required = false;
+			record.autoapprove_enabled = false;
 			record.updated_at = pending.transfer.timestamp;
 			record.pending_transfer = { transfer: pending.transfer, ownership_txid: broadcast.txid };
 			await putRecord(record);
-			state.pendingApproval = null;
-			$('#keylinkTransferModal').classList.remove('active');
-			$('#keylinkDetailModal').classList.remove('active');
+			if (!automatic) {
+				state.pendingApproval = null;
+				$('#keylinkTransferModal').classList.remove('active');
+				$('#keylinkDetailModal').classList.remove('active');
+			}
 			await reloadRecords();
 			try {
 				var result = await relayRequest('/api/keylink/secrets/' + record.secret_id + '/transfers', { method: 'POST', body: JSON.stringify(record.pending_transfer) });
 				await mergeRemoteState(result.state); await reloadRecords();
-				toast('Keylink ownership transferred on Sugarchain.');
+				toast(automatic ? 'Keylink transferred automatically.' : 'Keylink ownership transferred on Sugarchain.');
 			} catch (relayError) {
 				toast('Sugarchain accepted the transfer. Keylink will retry relay verification after propagation.', 'warning');
 			}
-		} catch (error) { toast(error.message || 'Keylink transfer failed.', 'danger'); }
+			return true;
+		} catch (error) {
+			if (!automatic) { toast(error.message || 'Keylink transfer failed.', 'danger'); }
+			throw error;
+		}
+	}
+
+	async function confirmApproval() {
+		var button = $('#keylinkConfirmTransfer');
+		if (!state.pendingApproval) { return; }
+		setBusy(button, true, 'Signing & broadcasting…');
+		try { await executeOwnershipTransfer(state.pendingApproval, false); }
+		catch (error) { /* executeOwnershipTransfer already displayed the manual error. */ }
 		finally { setBusy(button, false); }
+	}
+
+	function autoapproveDelay(record) {
+		var retries = Math.max(0, Number(record.autoapprove_retry_count || 0));
+		return Math.min(60 * 60 * 1000, Math.pow(2, retries) * 60 * 1000);
+	}
+
+	async function attemptAutoapprove(record) {
+		if (!record || record.current_owner !== state.ownerId || !record.pin_required || !record.autoapprove_enabled ||
+			record.pending_transfer || state.autoapproveInProgress[record.secret_id] || navigator.onLine === false) { return; }
+		var candidate = incomingRequests(record).find(function (request) {
+			return request.pin_verified === true && request.autoapprove_reserved === true &&
+				Number(request.request_state_version) === Number(record.state_version);
+		});
+		if (!candidate) { return; }
+		var lastAttempt = Date.parse(record.last_autoapprove_attempt || '') || 0;
+		if (lastAttempt && Date.now() - lastAttempt < autoapproveDelay(record)) { return; }
+		try { walletContext(); } catch (lockedError) { return; }
+		state.autoapproveInProgress[record.secret_id] = true;
+		record.last_autoapprove_attempt = new Date().toISOString();
+		await putRecord(record);
+		toast('Autoapproving Keylink transfer…');
+		try {
+			var remote = await resolveSecret(record.secret_id);
+			var currentRequest = requestForId({ requests: remote.requests }, candidate.request_id);
+			var pending = await prepareOwnershipTransfer(remote, currentRequest, true);
+			await executeOwnershipTransfer(pending, true);
+			record.autoapprove_retry_count = 0;
+			record.last_autoapprove_error = '';
+		} catch (error) {
+			record = findRecord(record.secret_id) || record;
+			record.autoapprove_retry_count = Number(record.autoapprove_retry_count || 0) + 1;
+			record.last_autoapprove_error = error.message || 'Autoapprove failed.';
+			record.last_autoapprove_attempt = new Date().toISOString();
+			await putRecord(record);
+			if (/insufficient|spendable|UTXO/i.test(record.last_autoapprove_error)) {
+				toast('Autoapprove pending — insufficient SUGAR for transaction fee.', 'warning');
+			} else {
+				toast('Autoapprove is pending and will retry later.', 'warning');
+			}
+		} finally {
+			delete state.autoapproveInProgress[record.secret_id];
+		}
 	}
 
 	function showIdentity() {
@@ -836,6 +1114,9 @@
 		});
 		$('#keylinkCreateForm').addEventListener('submit', createSecret);
 		$('#keylinkCreateBack').addEventListener('click', showLibraryView);
+		$('#keylinkRequirePin').addEventListener('change', function () { setCreatePinEnabled(this.checked); });
+		$('#keylinkRegenerateCreatePin').addEventListener('click', function () { state.createPin = Crypto.generatePin(); $('#keylinkCreatePinValue').textContent = state.createPin; });
+		$('#keylinkCopyCreatePin').addEventListener('click', function () { if (state.createPin) { Bridge.copyValue(state.createPin, 'Keylink PIN copied.'); } });
 		$('#keylinkSecretInput').addEventListener('input', function () { $('#keylinkSecretCount').textContent = Array.from(this.value).length + ' / 300'; });
 		$('#keylinkSearch').addEventListener('input', function () { state.query = this.value.trim(); renderLibrary(); });
 		$('#keylinkSort').addEventListener('change', function () { state.sort = this.value; renderLibrary(); });
@@ -848,13 +1129,21 @@
 				if (action.dataset.keylinkDetailAction === 'view') { viewSecret(action); }
 				if (action.dataset.keylinkDetailAction === 'qr') { showQr(); }
 				if (action.dataset.keylinkDetailAction === 'cancel-request') { cancelRequest(); }
+				if (action.dataset.keylinkDetailAction === 'try-request') { showScanResult(findRecord(state.activeSecretId)); }
 			}
+			var pinAction = event.target.closest('[data-keylink-pin-action]');
+			if (pinAction && pinAction.dataset.keylinkPinAction === 'copy') { copyActivePin(); }
+			if (pinAction && pinAction.dataset.keylinkPinAction === 'regenerate') { regeneratePin(); }
 			var copy = event.target.closest('[data-copy-value]');
 			if (copy) { Bridge.copyValue(copy.dataset.copyValue, 'Requester address copied.'); }
 			var approve = event.target.closest('[data-keylink-request-approve]');
 			if (approve) { prepareApproval(approve.dataset.keylinkRequestApprove, approve); }
 			var deny = event.target.closest('[data-keylink-request-deny]');
 			if (deny) { prepareDenial(deny.dataset.keylinkRequestDeny); }
+		});
+		$('#keylinkDetailModal').addEventListener('change', function (event) {
+			if (event.target.matches('[data-keylink-pin-required]')) { changePinRequirement(event.target.checked); }
+			if (event.target.matches('[data-keylink-autoapprove]')) { changeAutoapprove(event.target.checked); }
 		});
 		$('#keylinkCopySecret').addEventListener('click', function () { if (state.plainSecret) { Bridge.copyValue(state.plainSecret, 'Secret copied.'); } });
 		$('#keylinkCloseSecret').addEventListener('click', closeSecretModal);
@@ -864,6 +1153,13 @@
 		$('#keylinkConfirmTransfer').addEventListener('click', confirmApproval);
 		$('#keylinkCancelDeny').addEventListener('click', closeDenyModal);
 		$('#keylinkConfirmDeny').addEventListener('click', denyRequest);
+		$('#keylinkDismissReceived').addEventListener('click', function () { closeModal('#keylinkReceivedModal'); });
+		$('#keylinkViewReceived').addEventListener('click', function () {
+			var secretId = state.receivedSecretId;
+			closeModal('#keylinkReceivedModal');
+			Bridge.switchTab('keylink');
+			window.setTimeout(function () { if (secretId) { openDetail(secretId); } }, 250);
+		});
 		$('#keylinkCloseIdentity').addEventListener('click', function () { closeModal('#keylinkIdentityModal'); });
 		$('#keylinkCopyIdentity').addEventListener('click', function () { Bridge.copyValue($('#keylinkIdentityPublic').value, 'Public encryption key copied.'); });
 		$('#keylinkExportIdentity').addEventListener('submit', exportIdentity);
@@ -872,7 +1168,9 @@
 		window.addEventListener('sweetwallet:sensitive-cleared', function () {
 			state.identityPair = null; state.identityRecord = null; state.ownerId = ''; state.records = []; state.plainSecret = '';
 			state.pendingApproval = null; state.pendingDenial = null;
+			state.autoapproveInProgress = {}; state.receivedSecretId = ''; state.createPin = '';
 			window.clearInterval(state.pollTimer); state.pollTimer = 0; closeSecretModal(); closeModal('#keylinkTransferModal'); closeModal('#keylinkDenyModal');
+			closeModal('#keylinkReceivedModal');
 		});
 	}
 
@@ -890,13 +1188,15 @@
 	function init() {
 		if (!Crypto || !Bridge || !Storage || !$('#keylinkPanel')) { return; }
 		wireEvents();
+		setCreatePinEnabled(false);
 		refreshIcons();
 	}
 
 	window.SweetWalletKeylink = {
 		onPanelOpen: onPanelOpen,
 		handleScannedKeylink: handleScannedKeylink,
-		resolveCurrentOwner: async function (secretId) { return (await resolveSecret(Crypto.parseSecretUri(secretId))).current_owner; }
+		resolveCurrentOwner: async function (secretId) { return (await resolveSecret(Crypto.parseSecretUri(secretId))).current_owner; },
+		openSecret: async function (secretId) { await onPanelOpen(); await openDetail(Crypto.parseSecretUri(secretId)); }
 	};
 	document.addEventListener('DOMContentLoaded', init);
 }());

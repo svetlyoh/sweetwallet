@@ -2264,8 +2264,9 @@
 		throw new Error('The backend did not return a txid or accepted transaction response.');
 	}
 
-	function broadcastKeylinkTransfer(anchorHex) {
+	function broadcastKeylinkTransfer(anchorHex, options) {
 		var header = String(anchorHex || '').trim().toLowerCase();
+		var settings = options || {};
 		var fee = amountToSatoshis(state.fee);
 		var transaction;
 		var raw;
@@ -2283,7 +2284,7 @@
 			return Promise.reject(new Error('Another transaction is already being broadcast.'));
 		}
 		state.broadcasting = true;
-		return reauthenticateForSend().then(function () {
+		return (settings.skipReauthentication === true ? Promise.resolve() : reauthenticateForSend()).then(function () {
 			return selectUtxos(fee + 1);
 		}).then(function (selection) {
 			selection.change = selection.inputTotal - fee;

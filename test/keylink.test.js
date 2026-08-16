@@ -2,6 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const bitcoin = require('bitcoinjs-lib');
 const Keylink = require('../keylink-crypto.js');
 
@@ -33,6 +34,23 @@ test('permanent Keylink URI contains only a stable random Secret ID', () => {
 	assert.equal(Keylink.parseSecretUri(uri), id);
 	assert.equal(Keylink.parseSecretUri(id.toUpperCase()), id);
 	assert.equal(uri.includes('meeting'), false);
+});
+
+test('PIN-required Keylink URI exposes only the requirement flag', () => {
+	const id = '83f2c1a4264b81cd67cc037391ab72ef';
+	const uri = Keylink.createSecretUri(id, true);
+	assert.equal(uri, `keylink://secret/${id}?pin=1`);
+	assert.deepEqual(Keylink.parseSecretUriDetails(uri), { secretId: id, pinRequired: true });
+	assert.deepEqual(Keylink.parseSecretUriDetails(Keylink.createSecretUri(id)), { secretId: id, pinRequired: false });
+	assert.equal(uri.includes('483921'), false);
+});
+
+test('Keylink PIN generation is secure, six-digit, and preserves leading zeroes', () => {
+	const pins = Array.from({ length: 2000 }, () => Keylink.generatePin());
+	assert.equal(pins.every((pin) => /^\d{6}$/.test(pin)), true);
+	assert.equal(pins.some((pin) => pin.startsWith('0')), true);
+	assert.equal(new Set(pins).size > 1, true);
+	assert.doesNotMatch(fs.readFileSync(require.resolve('../keylink-crypto.js'), 'utf8'), /Math\.random\s*\(/);
 });
 
 test('secret stays encrypted while its content key moves between X25519 owners', async () => {
@@ -150,6 +168,28 @@ test('reloaded owner can rewrap an existing secret for a new owner', async () =>
 
 	encrypted.contentKey.fill(0);
 	buyerContentKey.fill(0);
+});
+
+test('active Keylink PIN is encrypted for the current owner in local storage', async () => {
+	const owner = sugarIdentity(13);
+	const identity = await Keylink.generateIdentity();
+	const secretId = '45'.repeat(16);
+	const protectedPin = await Keylink.protectLocalPin('004281', identity, secretId, owner.address, 2);
+	assert.equal(JSON.stringify(protectedPin).includes('004281'), false);
+	assert.equal(await Keylink.revealLocalPin(protectedPin, identity, secretId, owner.address, 2), '004281');
+	await assert.rejects(Keylink.revealLocalPin(protectedPin, identity, secretId, owner.address, 3), /does not match/);
+});
+
+test('Keylink UI exposes opt-in PIN controls and keeps autoapproval state-bound', () => {
+	const html = fs.readFileSync(require.resolve('../index.html'), 'utf8');
+	const client = fs.readFileSync(require.resolve('../keylink.js'), 'utf8');
+	assert.match(html, /id="keylinkRequirePin"/);
+	assert.match(html, /id="keylinkCreatePinValue"/);
+	assert.match(html, /id="keylinkCreateAutoapprove"[^>]*checked/);
+	assert.match(client, /state_version:\s*Number\(remote\.state_version\)/);
+	assert.match(client, /PIN_AUTOAPPROVE_ADVANCE_AUTHORIZATION/);
+	assert.match(client, /request\.pin_verified === true && request\.autoapprove_reserved === true/);
+	assert.match(client, /navigator\.onLine === false/);
 });
 
 test('secret length is capped at 300 characters', async () => {

@@ -6,6 +6,11 @@ export default defineConfig({
 		cloudflareTest({
 			wrangler: {
 				configPath: './wrangler.jsonc'
+			},
+			miniflare: {
+				bindings: {
+					KEYLINK_PIN_PEPPER: 'test-only-keylink-pin-pepper-64d8b9f1'
+				}
 			}
 		})
 	],

@@ -319,6 +319,16 @@
 									<form id="keylinkCreateForm" class="keylink-create-form" autocomplete="off">
 										<div class="form-row"><div class="keylink-label-row"><label for="keylinkSecretInput">Secret</label><span id="keylinkSecretCount">0 / 300</span></div><textarea id="keylinkSecretInput" rows="8" maxlength="300" required placeholder="Enter the secret to encrypt locally…"></textarea></div>
 										<div class="form-row"><label for="keylinkLabelInput">Optional label</label><input id="keylinkLabelInput" type="text" maxlength="80" placeholder="Example: Safe combination"><small>Stored only on this device. Never placed on-chain or sent to the relay.</small></div>
+										<section class="keylink-pin-settings" aria-labelledby="keylinkCreatePinHeading">
+											<label class="keylink-switch-row" for="keylinkRequirePin"><span><strong id="keylinkCreatePinHeading">Require PIN</strong><small>Gate ownership requests with a separate 6-digit PIN.</small></span><input id="keylinkRequirePin" type="checkbox"></label>
+											<div id="keylinkCreatePinOptions" class="keylink-pin-options hidden">
+												<div class="keylink-pin-display"><span>PIN</span><output id="keylinkCreatePinValue" aria-live="polite"></output></div>
+												<div class="keylink-pin-buttons"><button id="keylinkCopyCreatePin" class="button subtle" type="button"><i data-lucide="copy"></i>Copy PIN</button><button id="keylinkRegenerateCreatePin" class="button subtle" type="button"><i data-lucide="refresh-cw"></i>Regenerate</button></div>
+												<label class="keylink-switch-row" for="keylinkCreateAutoapprove"><span><strong>Autoapprove valid PIN request</strong></span><input id="keylinkCreateAutoapprove" type="checkbox" checked></label>
+												<p class="keylink-pin-note">Autoapprove only works while this wallet is online and unlocked.</p>
+												<div class="notice warning"><strong>Autoapprove is on by default.</strong> The first valid PIN request will transfer this Keylink automatically while this wallet is online and unlocked.</div>
+											</div>
+										</section>
 										<div class="notice"><strong>Permanent identity:</strong> Keylink creates one QR that continues to identify this secret across every ownership transfer.</div>
 										<button id="keylinkCreateSubmit" class="button" type="submit"><i data-lucide="lock-keyhole"></i>Encrypt &amp; Create Keylink</button>
 									</form>
@@ -710,6 +720,16 @@
 					<div class="summary-line"><span>Requester</span><strong id="keylinkDenyRequester" class="break-anywhere"></strong></div>
 				</div>
 				<div class="modal-actions"><button id="keylinkCancelDeny" class="button secondary" type="button">Keep Request</button><button id="keylinkConfirmDeny" class="button danger" type="button">DENY REQUEST</button></div>
+			</div>
+		</div>
+
+		<div id="keylinkReceivedModal" class="modal keylink-action-modal" role="dialog" aria-modal="true" aria-labelledby="keylinkReceivedTitle">
+			<div class="modal-card keylink-confirm-card">
+				<h2 id="keylinkReceivedTitle">Keylink Received</h2>
+				<p>You received a secret.</p>
+				<div id="keylinkReceivedSecret" class="keylink-readonly break-anywhere"></div>
+				<div class="notice">Open the Keylink details, then use View Secret when you are ready. Plaintext is never revealed automatically.</div>
+				<div class="modal-actions"><button id="keylinkDismissReceived" class="button secondary" type="button">Later</button><button id="keylinkViewReceived" class="button" type="button"><i data-lucide="eye"></i>View Secret</button></div>
 			</div>
 		</div>
 

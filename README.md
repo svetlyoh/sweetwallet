@@ -15,7 +15,7 @@ SweetWallet is a mobile-first Sugarchain web wallet focused on wallet-only behav
 - View and copy address, public key, private key WIF, and SegWit redeem script
 - Switch Sugarchain API backend
 - Open address and transaction history in the Sugarchain explorer
-- Create, request, transfer, and reveal encrypted Keylink secrets with Sugarchain-anchored ownership
+- Create, request, transfer, and reveal encrypted Keylink secrets with optional PIN-gated ownership and Sugarchain-anchored transfers
 - Logout without storing private key material
 - Optional starter funding for newly created zero-balance wallets when the local server has a funding wallet configured
 
@@ -47,11 +47,17 @@ Starter funding on Cloudflare requires a Worker secret:
 npx wrangler secret put SWEETWALLET_FUNDING_WIF
 ```
 
+Keylink PIN verification requires a separate high-entropy Worker secret. This value is used only as a server-side HMAC pepper and must never be committed or exposed to the browser:
+
+```powershell
+npx wrangler secret put KEYLINK_PIN_PEPPER
+```
+
 The configured feeder wallet address is `sugar1q39n666w687nxm9x98tx5kgw2uvk780gtmd6yyu`.
 
 ## Safety
 
-SweetWallet does not fake balances, does not auto-broadcast user spend transactions, and does not send private keys or WIFs to a server. Back up the WIF shown in the Keys panel before closing a newly created wallet.
+SweetWallet does not fake balances and does not send private keys or WIFs to a server. Ordinary SUGAR sends always require explicit confirmation. Keylink can auto-broadcast only its ownership-anchor transaction when the current owner explicitly enables PIN autoapproval for that secret and leaves the wallet online and unlocked. Back up the WIF shown in the Keys panel before closing a newly created wallet.
 
 ## Keylink
 
@@ -59,9 +65,11 @@ Keylink is a full-screen encrypted-secret library with one permanent public iden
 
 `keylink://secret/<128-bit-secret-id>`
 
-The QR contains only that identifier. Secret text is limited to 300 characters and encrypted locally with a random AES-256-GCM content key. The content key is wrapped to the current owner's dedicated X25519 identity with ephemeral X25519, HKDF-SHA256, and AES-GCM. Labels stay local and plaintext secrets are not persisted.
+An optional PIN-protected QR adds only the public capability flag `?pin=1`; the 6-digit PIN itself is never encoded in the QR. Secret text is limited to 300 characters and encrypted locally with a random AES-256-GCM content key. The content key is wrapped to the current owner's dedicated X25519 identity with ephemeral X25519, HKDF-SHA256, and AES-GCM. Labels stay local and plaintext secrets are not persisted.
 
-Ownership requests are signed by the requester's active Sugarchain key and coordinated off-chain by the Cloudflare relay. Approval rewraps the same content key to the requester, signs an ownership transition, and—only after explicit wallet confirmation—broadcasts an exact 76-byte binary `KLT1` OP_RETURN. The normal SweetWallet UTXO selection, fee, reauthentication, signing, broadcast, and change-return rules apply. No secret text or decryption key is placed on-chain.
+Ownership requests are signed by the requester's active Sugarchain key and coordinated off-chain by the Cloudflare relay. Owners can require a locally generated 6-digit PIN and can independently enable or disable autoapproval. The relay stores only a salted, server-peppered verifier, rate-limits failed attempts, and reserves at most one verified request for a particular ownership state. A qualifying autoapproval can run only while the owner's wallet is online, unlocked, able to sign, and funded for the network fee. Manual approval retains its in-app confirmation and wallet reauthentication.
+
+Approval rewraps the same content key to the requester, signs an ownership transition, and broadcasts an exact 76-byte binary `KLT1` OP_RETURN. The normal SweetWallet UTXO selection, fee, signing, broadcast, and change-return rules apply. No secret text, PIN, or decryption key is placed on-chain. After a protected Keylink changes owner, the previous PIN is consumed and the new owner receives a fresh local PIN on first open.
 
 The Cloudflare Worker uses one strongly consistent, SQLite-backed Durable Object per Secret ID. It stores only signed public metadata, encrypted secret material, the current owner envelope, requests, and transfer history. Before committing a transfer, the Worker verifies the Sugarchain transaction contains the expected `KLT1` record. The relay coordinates and indexes the signed chain state; it never receives wallet private keys, X25519 private keys, or plaintext secrets.
 

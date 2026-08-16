@@ -11,6 +11,7 @@ export const TXID_PATTERN = /^[0-9a-f]{64}$/;
 export const PUBLIC_KEY_PATTERN = /^(02|03)[0-9a-f]{64}$/;
 export const SIGNATURE_PATTERN = /^[0-9a-f]{128}$/;
 export const BASE64URL_PATTERN = /^[A-Za-z0-9_-]+$/;
+export const PIN_PATTERN = /^\d{6}$/;
 
 export const sugarNetwork = {
 	messagePrefix: '\x19Sugarchain Signed Message:\n',
@@ -236,7 +237,7 @@ export function validateRegistration(input) {
 		throw new Error('Registration nonce is invalid.');
 	}
 	validateTimestamp(input.created_at, 'Registration timestamp');
-	return {
+	const registration = {
 		protocol: KEYLINK_PROTOCOL,
 		type: 'secret_registration',
 		secret_id: secretId,
@@ -251,6 +252,13 @@ export function validateRegistration(input) {
 		created_at: new Date(Date.parse(input.created_at)).toISOString(),
 		signature: String(input.signature || '').toLowerCase()
 	};
+	if (Object.prototype.hasOwnProperty.call(input, 'pin_required')) {
+		registration.pin_required = input.pin_required === true;
+	}
+	if (Object.prototype.hasOwnProperty.call(input, 'autoapprove_enabled')) {
+		registration.autoapprove_enabled = registration.pin_required === true && input.autoapprove_enabled === true;
+	}
+	return registration;
 }
 
 export function validateOwnershipRequest(input) {
@@ -272,7 +280,7 @@ export function validateOwnershipRequest(input) {
 	}
 	assertBase64UrlBytes('Requester encryption public key', input.requester_encryption_key, 32);
 	validateTimestamp(input.created_at, 'Request timestamp');
-	return {
+	const ownershipRequest = {
 		protocol: KEYLINK_PROTOCOL,
 		type: 'ownership_request',
 		request_id: String(input.request_id).toLowerCase(),
@@ -281,6 +289,42 @@ export function validateOwnershipRequest(input) {
 		requester_id: requester,
 		requester_public_key: String(input.requester_public_key).toLowerCase(),
 		requester_encryption_key: String(input.requester_encryption_key),
+		nonce: String(input.nonce).toLowerCase(),
+		created_at: new Date(Date.parse(input.created_at)).toISOString(),
+		signature: String(input.signature || '').toLowerCase()
+	};
+	if (Object.prototype.hasOwnProperty.call(input, 'state_version')) {
+		const stateVersion = Number(input.state_version);
+		if (!Number.isInteger(stateVersion) || stateVersion < 1) {
+			throw new Error('Keylink request state version is invalid.');
+		}
+		ownershipRequest.state_version = stateVersion;
+	}
+	return ownershipRequest;
+}
+
+export function validatePinPolicyUpdate(input) {
+	if (!isPlainObject(input) || input.protocol !== KEYLINK_PROTOCOL || input.type !== 'pin_policy_update') {
+		throw new Error('Keylink PIN policy update is invalid.');
+	}
+	const stateVersion = Number(input.state_version);
+	if (!Number.isInteger(stateVersion) || stateVersion < 1 || !PUBLIC_KEY_PATTERN.test(String(input.owner_public_key || '').toLowerCase()) ||
+		!/^[0-9a-f]{32}$/.test(String(input.nonce || '').toLowerCase())) {
+		throw new Error('Keylink PIN policy authorization is invalid.');
+	}
+	validateTimestamp(input.created_at, 'PIN policy timestamp');
+	const pinRequired = input.pin_required === true;
+	return {
+		protocol: KEYLINK_PROTOCOL,
+		type: 'pin_policy_update',
+		secret_id: validateSecretId(input.secret_id),
+		owner_id: validateAddress(input.owner_id),
+		owner_public_key: String(input.owner_public_key).toLowerCase(),
+		state_version: stateVersion,
+		pin_required: pinRequired,
+		autoapprove_enabled: pinRequired && input.autoapprove_enabled === true,
+		replace_pin: pinRequired && input.replace_pin === true,
+		replace_reserved: input.replace_reserved === true,
 		nonce: String(input.nonce).toLowerCase(),
 		created_at: new Date(Date.parse(input.created_at)).toISOString(),
 		signature: String(input.signature || '').toLowerCase()
@@ -335,8 +379,11 @@ export function validateTransfer(input) {
 	if (!PUBLIC_KEY_PATTERN.test(String(input.owner_public_key || '').toLowerCase())) {
 		throw new Error('Transfer owner public key is invalid.');
 	}
-	if (!isPlainObject(input.authorization) || input.authorization.policy !== 'CURRENT_OWNER_MANUAL_APPROVAL' ||
-		input.authorization.provider !== 'ManualOwnerApprovalProvider' || input.authorization.decision !== 'approved') {
+	const manualApproval = isPlainObject(input.authorization) && input.authorization.policy === 'CURRENT_OWNER_MANUAL_APPROVAL' &&
+		input.authorization.provider === 'ManualOwnerApprovalProvider' && input.authorization.decision === 'approved';
+	const pinAutoapproval = isPlainObject(input.authorization) && input.authorization.policy === 'PIN_AUTOAPPROVE_ADVANCE_AUTHORIZATION' &&
+		input.authorization.provider === 'LocalWalletPinAutoapproveProvider' && input.authorization.decision === 'approved';
+	if (!manualApproval && !pinAutoapproval) {
 		throw new Error('Keylink transfer authorization is invalid.');
 	}
 	validateTimestamp(input.timestamp, 'Transfer timestamp');
@@ -353,8 +400,8 @@ export function validateTransfer(input) {
 		timestamp: new Date(Date.parse(input.timestamp)).toISOString(),
 		nonce: String(input.nonce).toLowerCase(),
 		authorization: {
-			policy: 'CURRENT_OWNER_MANUAL_APPROVAL',
-			provider: 'ManualOwnerApprovalProvider',
+			policy: input.authorization.policy,
+			provider: input.authorization.provider,
 			decision: 'approved'
 		},
 		owner_public_key: String(input.owner_public_key).toLowerCase(),

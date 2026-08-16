@@ -50,7 +50,8 @@ The central product rule is:
 
 - A Secret ID is 16 random bytes encoded as 32 lowercase hexadecimal characters.
 - Its permanent URI is `keylink://secret/{secret_id}`.
-- The QR contains only this public URI. It never contains the plaintext secret, content key, wallet private key, or Keylink private encryption key.
+- A PIN-protected Keylink uses `keylink://secret/{secret_id}?pin=1`. The query flag says only that a separately shared PIN is required; the PIN is never embedded in the URI or QR.
+- The QR never contains the plaintext secret, PIN, content key, wallet private key, or Keylink private encryption key.
 - The same URI remains valid through every ownership transfer.
 
 ### Protocol
@@ -63,6 +64,7 @@ The implemented signed record types are:
 - `ownership_request`
 - `ownership_request_denial`
 - `ownership_request_cancellation`
+- `pin_policy_update`
 - `ownership_transfer`
 
 Each signed record is serialized deterministically by sorting object keys. The wallet signs the SHA-256 digest of that stable JSON with its Sugarchain secp256k1 key. The `signature` and `ownership_txid` fields are excluded from the signing input.
@@ -118,6 +120,15 @@ The content key is wrapped separately from the encrypted secret. The owner envel
 
 Only the identity matching `recipient_key_hash` can unwrap the content key. A transfer creates a new owner envelope for the new owner's X25519 public key while leaving the encrypted secret ciphertext and permanent Secret ID unchanged.
 
+### Optional local PIN
+
+- Enabling PIN protection generates an exact 6-digit PIN with `crypto.getRandomValues`; leading zeroes are valid.
+- The browser protects its local PIN copy with an X25519-self-derived HKDF-SHA256/AES-256-GCM envelope bound to the Secret ID, owner address, and ownership state version.
+- The registration and PIN-policy requests transport the PIN over HTTPS only long enough for the relay to derive a verifier. Neither the plaintext PIN nor its local encrypted envelope is returned in public relay state.
+- The relay derives a per-secret verifier with HMAC-SHA256 using a random salt and the Cloudflare `KEYLINK_PIN_PEPPER` secret. The stored salt and verifier are redacted from every public response.
+- Five failed attempts within the rolling window trigger a 15-minute cooldown. Missing, malformed, wrong, and cooled-down submissions receive the same generic response and do not create a visible ownership request.
+- PINs are bound to an owner and state version. A successful transfer consumes the old PIN. A protected Keylink prompts the new owner's client to generate and register a fresh PIN on first open.
+
 ## Browser Storage
 
 Keylink uses IndexedDB database `sweetwallet_keylink_v1`, currently at version 3.
@@ -155,6 +166,7 @@ The relay's public state contains encrypted content and public metadata. Anyone 
 | `GET` | `/api/keylink/secrets/{secret_id}` | Resolve current encrypted state, requests, and transfer history. |
 | `POST` | `/api/keylink/batch` | Resolve up to 100 locally known Secret IDs during polling. |
 | `POST` | `/api/keylink/secrets/{secret_id}/requests` | Submit a signed ownership request. |
+| `POST` | `/api/keylink/secrets/{secret_id}/pin-policy` | Enable, disable, regenerate, or change the signed current-owner PIN/autoapproval policy. |
 | `POST` | `/api/keylink/secrets/{secret_id}/requests/{request_id}/deny` | Submit a current-owner-signed denial. |
 | `POST` | `/api/keylink/secrets/{secret_id}/requests/{request_id}/cancel` | Submit a requester-signed cancellation. |
 | `POST` | `/api/keylink/secrets/{secret_id}/transfers` | Verify an on-chain ownership anchor and atomically commit the new owner. |
@@ -183,8 +195,10 @@ The HTTP layer limits request-body sizes, validates route IDs against signed bod
 4. The requester signs an `ownership_request` containing their Sugarchain identity and X25519 public key.
 5. The request is saved locally and submitted to the relay.
 6. The Durable Object verifies the requester signature and current-owner version before accepting it.
-7. Duplicate pending requests from the same requester return the existing public state.
-8. A Keylink is limited to 100 pending requests.
+7. For a PIN-protected Keylink, the Durable Object verifies the state-bound PIN without persisting the submitted value. Invalid submissions return a generic acknowledgement and do not create a request.
+8. If autoapproval is enabled, the Durable Object atomically reserves the first valid request for that exact owner/state version. Concurrent valid requests can still be stored, but only the reserved request can use automatic transfer authorization.
+9. Duplicate pending requests from the same requester return the existing public state.
+10. A Keylink is limited to 100 pending requests.
 
 ### 3. View a secret
 
@@ -197,7 +211,7 @@ The HTTP layer limits request-body sizes, validates route IDs against signed bod
 
 The View Secret action shows an immediate `Opening…` state. Errors are displayed above all dialogs so a decryption, identity, or relay error cannot appear to do nothing.
 
-### 4. Approve ownership
+### 4. Approve ownership manually
 
 1. The owner clicks Approve on a pending request.
 2. The client shows `Preparing…` while it validates the current state.
@@ -213,9 +227,21 @@ The View Secret action shows an immediate `Opening…` state. Errors are display
 12. The Durable Object atomically changes owner/version/envelope, approves the selected request, stores the txid, and supersedes other pending requests.
 13. If the transaction has not propagated yet, the client keeps a pending transfer and retries relay verification.
 
-Approval requires a spendable Sugarchain UTXO sufficient to pay the configured fee and create a positive change output. It never broadcasts automatically; the final confirmation button is required.
+Manual approval requires a spendable Sugarchain UTXO sufficient to pay the configured fee and create a positive change output. The final confirmation button is required.
 
-### 5. Deny ownership
+### 5. PIN autoapproval
+
+1. PIN protection is optional per secret. Enabling it generates a PIN and turns autoapproval on by default; the owner can turn autoapproval off without disabling the PIN.
+2. The client attempts automatic processing only while the current owner's wallet is online, unlocked, has its matching X25519 identity, and can sign a Sugarchain transfer transaction.
+3. The client accepts only the relay's single `pin_verified` and `autoapprove_reserved` request for the current state version.
+4. It reuses the manual transfer preparation path: current-state validation, content-key unwrap, rewrap to the requester, signed ownership transition, deterministic `KLT1` construction, SweetWallet UTXO selection, fee calculation, signing, broadcast, and relay verification.
+5. The signed transfer carries `PIN_AUTOAPPROVE_ADVANCE_AUTHORIZATION`. The relay accepts that authorization only for the atomically reserved request and locks the reservation when broadcast begins.
+6. Network and funding failures use bounded local retry/backoff and leave the Keylink with its current owner. An insufficient-fee state is shown to the owner instead of silently weakening policy.
+7. On completion, the requester receives a direct in-app notification and must click View Secret before plaintext is decrypted and displayed.
+
+Autoapproval is advance authorization for the protocol ownership-anchor transaction and its normal fee. It does not bypass PIN verification, transfer signing, KLT1 validation, or the relay's atomic owner transition, and it never authorizes an ordinary SUGAR payment.
+
+### 6. Deny ownership
 
 1. The owner clicks Deny.
 2. An in-app “Deny Ownership Request?” dialog identifies the Secret ID and requester.
@@ -226,7 +252,7 @@ Approval requires a spendable Sugarchain UTXO sufficient to pay the configured f
 
 Denial does not require a blockchain transaction or fee. It no longer uses a native browser confirmation dialog.
 
-### 6. Cancel a request
+### 7. Cancel a request
 
 The requester can cancel their own pending request. The wallet signs an `ownership_request_cancellation`, and the relay verifies the request belongs to that requester before marking it cancelled. The current cancellation UI still uses the browser confirmation prompt.
 
@@ -266,14 +292,16 @@ The browser and Worker independently construct this payload. The Worker does not
 - Ownership transfers use strictly increasing state versions.
 - The Durable Object serializes state changes per Secret ID and rejects stale ownership.
 - Registration and transfer commits are idempotent for exact repeats.
-- The final approval transaction always requires explicit confirmation and wallet reauthentication when configured.
+- Manual approval requires explicit confirmation and wallet reauthentication when configured.
+- PIN autoapproval is opt-in per secret, is restricted to one relay-reserved request for one ownership state, and uses the same signed and on-chain transfer checks as manual approval.
+- PIN verifier material is salted, server-peppered, state-bound, and never returned by the relay.
 
 Important limitations:
 
 - Possession of a Keylink QR is not authorization and should not be treated as proof of ownership.
 - Secret IDs and encrypted relay state are public identifiers/data; do not put plaintext secrets in labels or request metadata.
 - Losing the current X25519 identity without a backup can make the encrypted secret unrecoverable even when the same Sugarchain wallet key is available.
-- The relay currently has duplicate-request and pending-count controls, but no separate CAPTCHA, account system, or per-IP rate limiter for Keylink requests.
+- The relay has duplicate-request and pending-count controls plus per-secret PIN failure cooldowns, but no separate CAPTCHA, account system, or per-IP rate limiter for non-PIN Keylink requests.
 - A real ownership approval depends on Sugarchain API availability, transaction broadcast, and transaction propagation.
 
 ## UI Behavior
@@ -287,6 +315,9 @@ Important limitations:
 - Toasts use a higher stacking layer than all modals, so action errors remain visible.
 - View and Approve buttons show busy text while cryptographic and relay preparation runs.
 - Approve and Deny both use consistent in-app confirmation dialogs.
+- PIN creation displays the generated value with Copy and Regenerate controls, while its QR contains only `?pin=1`.
+- A correct PIN request receives a PIN Verified indicator. An ownership recipient gets a direct NEW notification but must explicitly open View Secret.
+- Autoapproval status and its online/unlocked/funding requirements remain visible in the owner detail view.
 - Buttons and sheets remain touch-friendly for mobile Safari while also supporting desktop Edge.
 
 ## Verification Completed So Far
@@ -309,6 +340,11 @@ Automated coverage currently verifies:
 - Signed ownership requests and current-owner denials.
 - Atomic transfer commit, approved request state, and repeated-transfer idempotency.
 - Rejection of stale ownership transitions.
+- Exact 6-digit cryptographic PIN generation, leading-zero support, QR capability flags, and locally encrypted PIN envelopes.
+- Relay verifier redaction, generic invalid-PIN responses, failed-attempt cooldowns, and rejection of direct request bypasses.
+- PIN-policy enable, regenerate, disable, and manual-only behavior.
+- Atomic single-request autoapproval reservation under concurrent valid submissions.
+- One-time PIN consumption after transfer and fresh-PIN setup for the new owner.
 
 The latest local browser verification used two isolated browser origins against one local Wrangler Worker/Durable Object. It confirmed:
 
@@ -329,6 +365,7 @@ npm test
 npm run test:worker
 npm run test:all
 npx wrangler deploy --dry-run
+npx wrangler secret put KEYLINK_PIN_PEPPER
 npm run preview
 ```
 
@@ -343,3 +380,4 @@ Local static development through `npm run dev` serves the wallet at `http://loca
 - Durable Object binding: `KEYLINK_SECRETS`
 - Durable Object class: `KeylinkSecret`
 - Durable Object storage: SQLite
+- Required Keylink PIN secret: `KEYLINK_PIN_PEPPER` (high-entropy Cloudflare Worker secret; never commit its value)

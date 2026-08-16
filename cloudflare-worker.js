@@ -2,10 +2,12 @@ import bitcoin from 'bitcoinjs-lib';
 import { Buffer } from 'node:buffer';
 import { DurableObject } from 'cloudflare:workers';
 import {
+	PIN_PATTERN,
 	TXID_PATTERN,
 	createKlt1Hex,
 	transactionContainsKlt1,
 	validateOwnershipRequest,
+	validatePinPolicyUpdate,
 	validateRegistration,
 	validateRequestDecision,
 	validateSecretId,
@@ -18,6 +20,9 @@ const faucetAmountSatoshis = 2500000;
 const faucetMinimumBalanceSatoshis = 1000000;
 const faucetFeeSatoshis = 1000;
 const defaultFundingAddress = 'sugar1q39n666w687nxm9x98tx5kgw2uvk780gtmd6yyu';
+const pinAttemptLimit = 5;
+const pinAttemptWindowMs = 10 * 60 * 1000;
+const pinCooldownMs = 15 * 60 * 1000;
 
 const sugarNetwork = {
 	messagePrefix: '\x19Sugarchain Signed Message:\n',
@@ -338,7 +343,17 @@ export class KeylinkSecret extends DurableObject {
 					owner_envelope_json TEXT NOT NULL,
 					created_at TEXT NOT NULL,
 					updated_at TEXT NOT NULL,
-					latest_transfer_txid TEXT
+					latest_transfer_txid TEXT,
+					pin_required INTEGER NOT NULL DEFAULT 0,
+					pin_salt TEXT,
+					pin_verifier TEXT,
+					autoapprove_enabled INTEGER NOT NULL DEFAULT 0,
+					pin_state_version INTEGER,
+					autoapprove_reserved_request_id TEXT,
+					autoapprove_reserved_state_version INTEGER,
+					pin_failed_attempts INTEGER NOT NULL DEFAULT 0,
+					pin_window_started_at INTEGER,
+					pin_cooldown_until INTEGER
 				);
 				CREATE TABLE IF NOT EXISTS keylink_requests (
 					request_id TEXT PRIMARY KEY,
@@ -348,7 +363,11 @@ export class KeylinkSecret extends DurableObject {
 					created_at TEXT NOT NULL,
 					updated_at TEXT NOT NULL,
 					decision_json TEXT,
-					transfer_txid TEXT
+					transfer_txid TEXT,
+					pin_verified INTEGER NOT NULL DEFAULT 0,
+					request_state_version INTEGER,
+					autoapprove_reserved INTEGER NOT NULL DEFAULT 0,
+					autoapprove_broadcast_started INTEGER NOT NULL DEFAULT 0
 				);
 				CREATE INDEX IF NOT EXISTS idx_keylink_requests_status ON keylink_requests(status, updated_at DESC);
 				CREATE INDEX IF NOT EXISTS idx_keylink_requests_requester ON keylink_requests(requester_id, updated_at DESC);
@@ -359,7 +378,76 @@ export class KeylinkSecret extends DurableObject {
 					created_at TEXT NOT NULL
 				);
 			`);
+			this.ensureColumn('keylink_secret', 'pin_required', 'INTEGER NOT NULL DEFAULT 0');
+			this.ensureColumn('keylink_secret', 'pin_salt', 'TEXT');
+			this.ensureColumn('keylink_secret', 'pin_verifier', 'TEXT');
+			this.ensureColumn('keylink_secret', 'autoapprove_enabled', 'INTEGER NOT NULL DEFAULT 0');
+			this.ensureColumn('keylink_secret', 'pin_state_version', 'INTEGER');
+			this.ensureColumn('keylink_secret', 'autoapprove_reserved_request_id', 'TEXT');
+			this.ensureColumn('keylink_secret', 'autoapprove_reserved_state_version', 'INTEGER');
+			this.ensureColumn('keylink_secret', 'pin_failed_attempts', 'INTEGER NOT NULL DEFAULT 0');
+			this.ensureColumn('keylink_secret', 'pin_window_started_at', 'INTEGER');
+			this.ensureColumn('keylink_secret', 'pin_cooldown_until', 'INTEGER');
+			this.ensureColumn('keylink_requests', 'pin_verified', 'INTEGER NOT NULL DEFAULT 0');
+			this.ensureColumn('keylink_requests', 'request_state_version', 'INTEGER');
+			this.ensureColumn('keylink_requests', 'autoapprove_reserved', 'INTEGER NOT NULL DEFAULT 0');
+			this.ensureColumn('keylink_requests', 'autoapprove_broadcast_started', 'INTEGER NOT NULL DEFAULT 0');
 		});
+	}
+
+	ensureColumn(table, column, definition) {
+		const exists = this.ctx.storage.sql.exec(`PRAGMA table_info(${table})`).toArray().some((row) => row.name === column);
+		if (!exists) {
+			this.ctx.storage.sql.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+		}
+	}
+
+	async pinKey() {
+		const pepper = String(this.env.KEYLINK_PIN_PEPPER || '');
+		if (pepper.length < 32) {
+			throw new Error('Keylink PIN protection is temporarily unavailable.');
+		}
+		return crypto.subtle.importKey('raw', new TextEncoder().encode(pepper), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
+	}
+
+	pinMessage(secretId, owner, stateVersion, salt, pin) {
+		return new TextEncoder().encode(JSON.stringify([secretId, owner, Number(stateVersion), salt, pin]));
+	}
+
+	async createPinVerifier(secretId, owner, stateVersion, pin) {
+		if (!PIN_PATTERN.test(String(pin || ''))) {
+			throw new Error('Keylink PIN must contain exactly 6 digits.');
+		}
+		const saltBytes = crypto.getRandomValues(new Uint8Array(16));
+		const salt = Buffer.from(saltBytes).toString('base64url');
+		const verifier = await crypto.subtle.sign('HMAC', await this.pinKey(), this.pinMessage(secretId, owner, stateVersion, salt, pin));
+		return { salt, verifier: Buffer.from(verifier).toString('base64url') };
+	}
+
+	async verifyPin(secret, pin) {
+		if (!PIN_PATTERN.test(String(pin || '')) || !secret.pin_salt || !secret.pin_verifier) {
+			return false;
+		}
+		return crypto.subtle.verify(
+			'HMAC',
+			await this.pinKey(),
+			Buffer.from(secret.pin_verifier, 'base64url'),
+			this.pinMessage(secret.secret_id, secret.current_owner, secret.pin_state_version, secret.pin_salt, pin)
+		);
+	}
+
+	recordFailedPinAttempt(secret) {
+		const now = Date.now();
+		const insideWindow = Number(secret.pin_window_started_at || 0) > now - pinAttemptWindowMs;
+		const attempts = insideWindow ? Number(secret.pin_failed_attempts || 0) + 1 : 1;
+		const windowStarted = insideWindow ? Number(secret.pin_window_started_at) : now;
+		const cooldownUntil = attempts >= pinAttemptLimit ? now + pinCooldownMs : null;
+		this.ctx.storage.sql.exec(
+			`UPDATE keylink_secret SET pin_failed_attempts = ?, pin_window_started_at = ?, pin_cooldown_until = ? WHERE singleton = 1`,
+			cooldownUntil ? 0 : attempts,
+			cooldownUntil ? null : windowStarted,
+			cooldownUntil
+		);
 	}
 
 	secretRow() {
@@ -373,7 +461,9 @@ export class KeylinkSecret extends DurableObject {
 			throw new Error('Keylink secret is not registered.');
 		}
 		const requests = this.ctx.storage.sql.exec(
-			'SELECT request_json, status, updated_at, decision_json, transfer_txid FROM keylink_requests ORDER BY updated_at DESC LIMIT 200'
+			`SELECT request_json, status, updated_at, decision_json, transfer_txid,
+			        pin_verified, request_state_version, autoapprove_reserved, autoapprove_broadcast_started
+			 FROM keylink_requests ORDER BY updated_at DESC LIMIT 200`
 		).toArray().map((row) => {
 			const request = JSON.parse(row.request_json);
 			return {
@@ -381,7 +471,11 @@ export class KeylinkSecret extends DurableObject {
 				status: row.status,
 				updated_at: row.updated_at,
 				decision: row.decision_json ? JSON.parse(row.decision_json) : null,
-				transfer_txid: row.transfer_txid || null
+				transfer_txid: row.transfer_txid || null,
+				pin_verified: Number(row.pin_verified) === 1,
+				request_state_version: row.request_state_version === null ? null : Number(row.request_state_version),
+				autoapprove_reserved: Number(row.autoapprove_reserved) === 1,
+				autoapprove_broadcast_started: Number(row.autoapprove_broadcast_started) === 1
 			};
 		});
 		const transfers = this.ctx.storage.sql.exec(
@@ -390,24 +484,28 @@ export class KeylinkSecret extends DurableObject {
 			...JSON.parse(row.transfer_json),
 			ownership_txid: row.txid
 		}));
+		const registration = JSON.parse(secret.registration_json);
+		delete registration.autoapprove_enabled;
 		return {
 			protocol: 'KEYLINK1',
 			secret_id: secret.secret_id,
 			created_by: secret.created_by,
 			current_owner: secret.current_owner,
 			state_version: Number(secret.state_version),
-			registration: JSON.parse(secret.registration_json),
+			registration,
 			encrypted_secret: JSON.parse(secret.encrypted_secret_json),
 			owner_envelope: JSON.parse(secret.owner_envelope_json),
 			latest_transfer_txid: secret.latest_transfer_txid || null,
 			created_at: secret.created_at,
 			updated_at: secret.updated_at,
+			pin_required: Number(secret.pin_required) === 1,
+			pin_setup_required: Number(secret.pin_required) === 1 && (!secret.pin_verifier || Number(secret.pin_state_version) !== Number(secret.state_version)),
 			requests,
 			transfers
 		};
 	}
 
-	async register(registrationInput) {
+	async register(registrationInput, pin = '') {
 		const registration = validateRegistration(registrationInput);
 		await verifySignedRecord(registration, registration.current_owner, registration.owner_public_key);
 		const existing = this.secretRow();
@@ -417,12 +515,16 @@ export class KeylinkSecret extends DurableObject {
 			}
 			throw new Error('This Keylink Secret ID is already registered.');
 		}
+		const pinRequired = registration.pin_required === true;
+		const autoapproveEnabled = pinRequired && registration.autoapprove_enabled !== false;
+		const pinRecord = pinRequired ? await this.createPinVerifier(registration.secret_id, registration.current_owner, 1, pin) : null;
 		this.ctx.storage.sql.exec(
 			`INSERT INTO keylink_secret (
 				singleton, secret_id, created_by, current_owner, state_version,
 				registration_json, encrypted_secret_json, owner_envelope_json,
-				created_at, updated_at, latest_transfer_txid
-			) VALUES (1, ?, ?, ?, 1, ?, ?, ?, ?, ?, NULL)`,
+				created_at, updated_at, latest_transfer_txid, pin_required, pin_salt,
+				pin_verifier, autoapprove_enabled, pin_state_version
+			) VALUES (1, ?, ?, ?, 1, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)`,
 			registration.secret_id,
 			registration.created_by,
 			registration.current_owner,
@@ -430,28 +532,57 @@ export class KeylinkSecret extends DurableObject {
 			JSON.stringify(registration.encrypted_secret),
 			JSON.stringify(registration.owner_envelope),
 			registration.created_at,
-			registration.created_at
+			registration.created_at,
+			pinRequired ? 1 : 0,
+			pinRecord && pinRecord.salt,
+			pinRecord && pinRecord.verifier,
+			autoapproveEnabled ? 1 : 0,
+			pinRequired ? 1 : null
 		);
 		return this.publicState();
 	}
 
-	async createRequest(requestInput) {
+	async submitRequest(requestInput, pin = '') {
 		const ownershipRequest = validateOwnershipRequest(requestInput);
 		await verifySignedRecord(ownershipRequest, ownershipRequest.requester_id, ownershipRequest.requester_public_key);
-		const secret = this.secretRow();
+		let secret = this.secretRow();
 		if (!secret) {
 			throw new Error('Keylink secret is not registered.');
 		}
 		if (secret.secret_id !== ownershipRequest.secret_id || secret.current_owner !== ownershipRequest.current_owner_id) {
 			throw new Error('Keylink ownership changed before this request was accepted.');
 		}
+		const pinRequired = Number(secret.pin_required) === 1;
+		if (Object.prototype.hasOwnProperty.call(ownershipRequest, 'state_version') && Number(ownershipRequest.state_version) !== Number(secret.state_version)) {
+			if (pinRequired) { return { pinRequired: true, accepted: false, state: null }; }
+			throw new Error('Keylink ownership changed before this request was accepted.');
+		}
+		let pinVerified = false;
+		if (pinRequired) {
+			if (!secret.pin_verifier || Number(secret.pin_state_version) !== Number(secret.state_version) || Number(secret.pin_cooldown_until || 0) > Date.now()) {
+				return { pinRequired: true, accepted: false, state: null };
+			}
+			pinVerified = await this.verifyPin(secret, pin);
+			const latest = this.secretRow();
+			if (!latest || latest.current_owner !== secret.current_owner || Number(latest.state_version) !== Number(secret.state_version) || latest.pin_verifier !== secret.pin_verifier) {
+				return { pinRequired: true, accepted: false, state: null };
+			}
+			secret = latest;
+			if (!pinVerified) {
+				this.recordFailedPinAttempt(latest);
+				return { pinRequired: true, accepted: false, state: null };
+			}
+			this.ctx.storage.sql.exec('UPDATE keylink_secret SET pin_failed_attempts = 0, pin_window_started_at = NULL, pin_cooldown_until = NULL WHERE singleton = 1');
+		}
 		const duplicate = this.ctx.storage.sql.exec(
 			"SELECT request_id FROM keylink_requests WHERE requester_id = ? AND status = 'pending' LIMIT 1",
 			ownershipRequest.requester_id
 		).toArray()[0];
 		if (duplicate) {
-			return this.publicState();
+			return { pinRequired, accepted: true, state: pinRequired ? null : this.publicState() };
 		}
+		const autoapprove = pinRequired && Number(secret.autoapprove_enabled) === 1;
+		const reserveForAutoapprove = autoapprove && !secret.autoapprove_reserved_request_id;
 		const pendingCount = this.ctx.storage.sql.exec(
 			"SELECT COUNT(*) AS count FROM keylink_requests WHERE status = 'pending'"
 		).one().count;
@@ -460,14 +591,98 @@ export class KeylinkSecret extends DurableObject {
 		}
 		this.ctx.storage.sql.exec(
 			`INSERT INTO keylink_requests (
-				request_id, requester_id, request_json, status, created_at, updated_at
-			) VALUES (?, ?, ?, 'pending', ?, ?)`,
+				request_id, requester_id, request_json, status, created_at, updated_at,
+				pin_verified, request_state_version, autoapprove_reserved
+			) VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?)`,
 			ownershipRequest.request_id,
 			ownershipRequest.requester_id,
 			JSON.stringify(ownershipRequest),
 			ownershipRequest.created_at,
-			ownershipRequest.created_at
+			ownershipRequest.created_at,
+			pinVerified ? 1 : 0,
+			Object.prototype.hasOwnProperty.call(ownershipRequest, 'state_version') ? ownershipRequest.state_version : secret.state_version,
+			reserveForAutoapprove ? 1 : 0
 		);
+		if (reserveForAutoapprove) {
+			this.ctx.storage.sql.exec(
+				'UPDATE keylink_secret SET autoapprove_reserved_request_id = ?, autoapprove_reserved_state_version = ? WHERE singleton = 1',
+				ownershipRequest.request_id,
+				secret.state_version
+			);
+		}
+		return { pinRequired, accepted: true, state: pinRequired ? null : this.publicState() };
+	}
+
+	async createRequest(requestInput, pin = '') {
+		const result = await this.submitRequest(requestInput, pin);
+		return result.state || this.publicState();
+	}
+
+	async updatePinPolicy(updateInput, pin = '') {
+		const update = validatePinPolicyUpdate(updateInput);
+		await verifySignedRecord(update, update.owner_id, update.owner_public_key);
+		let secret = this.secretRow();
+		if (!secret || secret.secret_id !== update.secret_id || secret.current_owner !== update.owner_id || Number(secret.state_version) !== update.state_version) {
+			throw new Error('Keylink ownership changed before the PIN policy was updated.');
+		}
+		let reserved = secret.autoapprove_reserved_request_id ? this.ctx.storage.sql.exec(
+			'SELECT request_id, autoapprove_broadcast_started FROM keylink_requests WHERE request_id = ?', secret.autoapprove_reserved_request_id
+		).toArray()[0] : null;
+		if (reserved && Number(reserved.autoapprove_broadcast_started) === 1 && (!update.pin_required || update.replace_pin || !update.autoapprove_enabled)) {
+			throw new Error('The reserved Keylink transfer has already been broadcast.');
+		}
+		if (reserved && update.replace_pin && !update.replace_reserved) {
+			throw new Error('Confirm replacement of the reserved PIN request before regenerating.');
+		}
+		let pinRecord = null;
+		if (update.pin_required) {
+			if (update.replace_pin || !secret.pin_verifier || Number(secret.pin_state_version) !== update.state_version) {
+				pinRecord = await this.createPinVerifier(update.secret_id, update.owner_id, update.state_version, pin);
+			}
+		}
+		secret = this.secretRow();
+		if (!secret || secret.current_owner !== update.owner_id || Number(secret.state_version) !== update.state_version) {
+			throw new Error('Keylink ownership changed before the PIN policy was updated.');
+		}
+		reserved = secret.autoapprove_reserved_request_id ? this.ctx.storage.sql.exec(
+			'SELECT request_id, autoapprove_broadcast_started FROM keylink_requests WHERE request_id = ?', secret.autoapprove_reserved_request_id
+		).toArray()[0] : null;
+		if (reserved && Number(reserved.autoapprove_broadcast_started) === 1 && (!update.pin_required || update.replace_pin || !update.autoapprove_enabled)) {
+			throw new Error('The reserved Keylink transfer has already been broadcast.');
+		}
+		if (reserved && update.replace_pin && !update.replace_reserved) {
+			throw new Error('Confirm replacement of the reserved PIN request before regenerating.');
+		}
+		if (reserved && (update.replace_reserved || !update.autoapprove_enabled || !update.pin_required)) {
+			this.ctx.storage.sql.exec('UPDATE keylink_requests SET autoapprove_reserved = 0 WHERE request_id = ?', reserved.request_id);
+			this.ctx.storage.sql.exec('UPDATE keylink_secret SET autoapprove_reserved_request_id = NULL, autoapprove_reserved_state_version = NULL WHERE singleton = 1');
+		}
+		if (!update.pin_required) {
+			this.ctx.storage.sql.exec(`UPDATE keylink_secret SET pin_required = 0, pin_salt = NULL, pin_verifier = NULL,
+				autoapprove_enabled = 0, pin_state_version = NULL, pin_failed_attempts = 0,
+				pin_window_started_at = NULL, pin_cooldown_until = NULL WHERE singleton = 1`);
+			return this.publicState();
+		}
+		this.ctx.storage.sql.exec(
+			`UPDATE keylink_secret SET pin_required = 1, pin_salt = COALESCE(?, pin_salt),
+			 pin_verifier = COALESCE(?, pin_verifier), autoapprove_enabled = ?, pin_state_version = ?,
+			 pin_failed_attempts = 0, pin_window_started_at = NULL, pin_cooldown_until = NULL WHERE singleton = 1`,
+			pinRecord && pinRecord.salt,
+			pinRecord && pinRecord.verifier,
+			update.autoapprove_enabled ? 1 : 0,
+			update.state_version
+		);
+		const after = this.secretRow();
+		if (update.autoapprove_enabled && !after.autoapprove_reserved_request_id && !update.replace_pin) {
+			const candidate = this.ctx.storage.sql.exec(
+				`SELECT request_id FROM keylink_requests WHERE status = 'pending' AND pin_verified = 1
+				 AND request_state_version = ? ORDER BY created_at ASC LIMIT 1`, update.state_version
+			).toArray()[0];
+			if (candidate) {
+				this.ctx.storage.sql.exec('UPDATE keylink_requests SET autoapprove_reserved = 1 WHERE request_id = ?', candidate.request_id);
+				this.ctx.storage.sql.exec('UPDATE keylink_secret SET autoapprove_reserved_request_id = ?, autoapprove_reserved_state_version = ? WHERE singleton = 1', candidate.request_id, update.state_version);
+			}
+		}
 		return this.publicState();
 	}
 
@@ -482,7 +697,7 @@ export class KeylinkSecret extends DurableObject {
 			throw new Error('Only the current Keylink owner can deny this request.');
 		}
 		const row = this.ctx.storage.sql.exec(
-			'SELECT status FROM keylink_requests WHERE request_id = ?', decision.request_id
+			'SELECT status, autoapprove_reserved, autoapprove_broadcast_started FROM keylink_requests WHERE request_id = ?', decision.request_id
 		).toArray()[0];
 		if (!row) {
 			throw new Error('Keylink ownership request was not found.');
@@ -493,12 +708,18 @@ export class KeylinkSecret extends DurableObject {
 		if (row.status !== 'pending') {
 			throw new Error('Keylink ownership request is no longer pending.');
 		}
+		if (Number(row.autoapprove_broadcast_started) === 1) {
+			throw new Error('The reserved Keylink transfer has already been broadcast.');
+		}
 		this.ctx.storage.sql.exec(
 			"UPDATE keylink_requests SET status = 'denied', updated_at = ?, decision_json = ? WHERE request_id = ? AND status = 'pending'",
 			decision.created_at,
 			JSON.stringify(decision),
 			decision.request_id
 		);
+		if (Number(row.autoapprove_reserved) === 1) {
+			this.ctx.storage.sql.exec('UPDATE keylink_secret SET autoapprove_reserved_request_id = NULL, autoapprove_reserved_state_version = NULL WHERE singleton = 1 AND autoapprove_reserved_request_id = ?', decision.request_id);
+		}
 		return this.publicState();
 	}
 
@@ -510,7 +731,7 @@ export class KeylinkSecret extends DurableObject {
 			throw new Error('Keylink secret is not registered.');
 		}
 		const row = this.ctx.storage.sql.exec(
-			'SELECT requester_id, status FROM keylink_requests WHERE request_id = ?', decision.request_id
+			'SELECT requester_id, status, autoapprove_reserved, autoapprove_broadcast_started FROM keylink_requests WHERE request_id = ?', decision.request_id
 		).toArray()[0];
 		if (!row || row.requester_id !== decision.requester_id) {
 			throw new Error('Keylink ownership request was not found.');
@@ -521,13 +742,32 @@ export class KeylinkSecret extends DurableObject {
 		if (row.status !== 'pending') {
 			throw new Error('Keylink ownership request is no longer pending.');
 		}
+		if (Number(row.autoapprove_broadcast_started) === 1) {
+			throw new Error('The reserved Keylink transfer has already been broadcast.');
+		}
 		this.ctx.storage.sql.exec(
 			"UPDATE keylink_requests SET status = 'cancelled', updated_at = ?, decision_json = ? WHERE request_id = ? AND status = 'pending'",
 			decision.created_at,
 			JSON.stringify(decision),
 			decision.request_id
 		);
+		if (Number(row.autoapprove_reserved) === 1) {
+			this.ctx.storage.sql.exec('UPDATE keylink_secret SET autoapprove_reserved_request_id = NULL, autoapprove_reserved_state_version = NULL WHERE singleton = 1 AND autoapprove_reserved_request_id = ?', decision.request_id);
+		}
 		return this.publicState();
+	}
+
+	async markTransferBroadcast(transferInput, ownershipTxid) {
+		const transfer = validateTransfer(transferInput);
+		const txid = String(ownershipTxid || '').trim().toLowerCase();
+		if (!TXID_PATTERN.test(txid)) { throw new Error('Sugarchain ownership transaction ID is invalid.'); }
+		await verifySignedRecord(transfer, transfer.from, transfer.owner_public_key);
+		if (transfer.authorization.policy !== 'PIN_AUTOAPPROVE_ADVANCE_AUTHORIZATION') { return; }
+		const secret = this.secretRow();
+		if (!secret || secret.autoapprove_reserved_request_id !== transfer.request_id || Number(secret.state_version) !== transfer.previous_state_version) {
+			throw new Error('The autoapproved Keylink request is no longer reserved.');
+		}
+		this.ctx.storage.sql.exec('UPDATE keylink_requests SET autoapprove_broadcast_started = 1 WHERE request_id = ? AND status = \'pending\'', transfer.request_id);
 	}
 
 	async commitTransfer(transferInput, ownershipTxid) {
@@ -551,10 +791,14 @@ export class KeylinkSecret extends DurableObject {
 			throw new Error('Keylink ownership changed before this transfer was committed.');
 		}
 		const request = this.ctx.storage.sql.exec(
-			'SELECT requester_id, status FROM keylink_requests WHERE request_id = ?', transfer.request_id
+			'SELECT requester_id, status, autoapprove_reserved, autoapprove_broadcast_started FROM keylink_requests WHERE request_id = ?', transfer.request_id
 		).toArray()[0];
 		if (!request || request.requester_id !== transfer.to || request.status !== 'pending') {
 			throw new Error('The approved Keylink request is missing or no longer pending.');
+		}
+		if (transfer.authorization.policy === 'PIN_AUTOAPPROVE_ADVANCE_AUTHORIZATION' &&
+			(Number(request.autoapprove_reserved) !== 1 || Number(request.autoapprove_broadcast_started) !== 1 || secret.autoapprove_reserved_request_id !== transfer.request_id)) {
+			throw new Error('The autoapproved Keylink request is not reserved for this ownership state.');
 		}
 		this.ctx.storage.sql.exec(
 			`INSERT INTO keylink_transfers (state_version, transfer_json, txid, created_at)
@@ -567,7 +811,10 @@ export class KeylinkSecret extends DurableObject {
 		this.ctx.storage.sql.exec(
 			`UPDATE keylink_secret
 			 SET current_owner = ?, state_version = ?, owner_envelope_json = ?,
-			     updated_at = ?, latest_transfer_txid = ?
+			     updated_at = ?, latest_transfer_txid = ?, pin_salt = NULL, pin_verifier = NULL,
+			     autoapprove_enabled = 0, pin_state_version = NULL,
+			     autoapprove_reserved_request_id = NULL, autoapprove_reserved_state_version = NULL,
+			     pin_failed_attempts = 0, pin_window_started_at = NULL, pin_cooldown_until = NULL
 			 WHERE singleton = 1 AND current_owner = ? AND state_version = ?`,
 			transfer.to,
 			transfer.new_state_version,
@@ -621,8 +868,9 @@ async function handleKeylinkRequest(request, env) {
 	const path = url.pathname;
 	if (path === '/api/keylink/secrets' && request.method === 'POST') {
 		const body = await readBoundedJson(request);
-		const registration = validateRegistration(body);
-		return jsonResponse({ state: await keylinkStub(env, registration.secret_id).register(registration) }, 201);
+		const registration = validateRegistration(body.registration || body);
+		const pin = body.registration ? String(body.pin || '') : '';
+		return jsonResponse({ state: await keylinkStub(env, registration.secret_id).register(registration, pin) }, 201);
 	}
 	if (path === '/api/keylink/batch' && request.method === 'POST') {
 		const body = await readBoundedJson(request, 16384);
@@ -652,10 +900,23 @@ async function handleKeylinkRequest(request, env) {
 	}
 	if (action === 'requests' && request.method === 'POST') {
 		const body = await readBoundedJson(request);
-		if (validateSecretId(body.secret_id) !== secretId) {
+		const ownershipRequest = validateOwnershipRequest(body.request || body);
+		if (ownershipRequest.secret_id !== secretId) {
 			throw new Error('Keylink request path does not match its Secret ID.');
 		}
-		return jsonResponse({ state: await stub.createRequest(body) }, 201);
+		const result = await stub.submitRequest(ownershipRequest, body.request ? String(body.pin || '') : '');
+		if (result.pinRequired) {
+			return jsonResponse({ submitted: true, message: 'Request received.' }, 202);
+		}
+		return jsonResponse({ state: result.state }, 201);
+	}
+	if (action === 'pin-policy' && request.method === 'POST') {
+		const body = await readBoundedJson(request);
+		const update = validatePinPolicyUpdate(body.update);
+		if (update.secret_id !== secretId) {
+			throw new Error('Keylink PIN policy path does not match its signed record.');
+		}
+		return jsonResponse({ state: await stub.updatePinPolicy(update, String(body.pin || '')) });
 	}
 	const requestMatch = action.match(/^requests\/([0-9a-f]{32})\/(deny|cancel)$/i);
 	if (requestMatch && request.method === 'POST') {
@@ -675,6 +936,7 @@ async function handleKeylinkRequest(request, env) {
 			throw new Error('Keylink transfer path or transaction ID is invalid.');
 		}
 		await verifySignedRecord(transfer, transfer.from, transfer.owner_public_key);
+		await stub.markTransferBroadcast(transfer, txid);
 		await verifyKlt1Transaction(env, transfer, txid);
 		return jsonResponse({ state: await stub.commitTransfer(transfer, txid) });
 	}

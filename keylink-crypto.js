@@ -15,7 +15,9 @@
 	var SECRET_CIPHER = 'AES-256-GCM';
 	var ENVELOPE_CIPHER = 'X25519-HKDF-SHA256+A256GCM';
 	var IDENTITY_BACKUP_PROTOCOL = 'KEYLINK-IDENTITY-BACKUP1';
+	var LOCAL_PIN_PROTOCOL = 'KEYLINK-LOCAL-PIN1';
 	var HKDF_LABEL = 'SWEETWALLET_KEYLINK_CONTENT_KEY_V1';
+	var LOCAL_PIN_HKDF_LABEL = 'SWEETWALLET_KEYLINK_LOCAL_PIN_V1';
 	var MAX_SECRET_LENGTH = 300;
 	var BACKUP_ITERATIONS = 600000;
 
@@ -160,14 +162,14 @@
 		return bytesToHex(randomBytes(16));
 	}
 
-	function createSecretUri(secretId) {
-		return URI_PREFIX + normalizeSecretId(secretId);
+	function createSecretUri(secretId, pinRequired) {
+		return URI_PREFIX + normalizeSecretId(secretId) + (pinRequired ? '?pin=1' : '');
 	}
 
-	function parseSecretUri(value) {
+	function parseSecretUriDetails(value) {
 		var text = String(value || '').trim();
 		if (/^[0-9a-f]{32}$/i.test(text)) {
-			return normalizeSecretId(text);
+			return { secretId: normalizeSecretId(text), pinRequired: false };
 		}
 		var uri;
 		try {
@@ -178,7 +180,23 @@
 		if (uri.protocol.toLowerCase() !== 'keylink:' || uri.hostname.toLowerCase() !== 'secret') {
 			throw new Error('This is not a supported Keylink QR.');
 		}
-		return normalizeSecretId(uri.pathname.replace(/^\/+/, '').split('/')[0]);
+		return {
+			secretId: normalizeSecretId(uri.pathname.replace(/^\/+/, '').split('/')[0]),
+			pinRequired: uri.searchParams.get('pin') === '1'
+		};
+	}
+
+	function parseSecretUri(value) {
+		return parseSecretUriDetails(value).secretId;
+	}
+
+	function generatePin() {
+		var values = new Uint32Array(1);
+		var limit = Math.floor(0x100000000 / 1000000) * 1000000;
+		do {
+			getCrypto().getRandomValues(values);
+		} while (values[0] >= limit);
+		return String(values[0] % 1000000).padStart(6, '0');
 	}
 
 	function generateIdentity() {
@@ -361,6 +379,74 @@
 		}
 	}
 
+	function localPinAad(secretId, ownerId, version) {
+		return encoder().encode(stableStringify({
+			protocol: LOCAL_PIN_PROTOCOL,
+			secret_id: normalizeSecretId(secretId),
+			owner_id: String(ownerId || '').trim(),
+			state_version: Number(version)
+		}));
+	}
+
+	async function deriveLocalPinKey(identity, secretId, ownerId, version) {
+		if (!identity || !identity.privateKey || !identity.publicKey) {
+			throw new Error('Keylink encryption identity is unavailable.');
+		}
+		var shared = new Uint8Array(await getCrypto().subtle.deriveBits({ name: 'X25519', public: identity.publicKey }, identity.privateKey, 256));
+		try {
+			var material = await getCrypto().subtle.importKey('raw', shared, 'HKDF', false, ['deriveKey']);
+			var salt = await sha256Bytes(LOCAL_PIN_HKDF_LABEL + '|' + normalizeSecretId(secretId) + '|' + String(ownerId || '').trim() + '|' + Number(version));
+			return await getCrypto().subtle.deriveKey({
+				name: 'HKDF', hash: 'SHA-256', salt: salt,
+				info: encoder().encode(LOCAL_PIN_HKDF_LABEL)
+			}, material, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+		} finally {
+			shared.fill(0);
+		}
+	}
+
+	async function protectLocalPin(pinValue, identity, secretId, ownerId, version) {
+		var pin = String(pinValue || '');
+		if (!/^\d{6}$/.test(pin)) {
+			throw new Error('Keylink PIN must contain exactly 6 digits.');
+		}
+		var nonce = randomBytes(12);
+		var key = await deriveLocalPinKey(identity, secretId, ownerId, version);
+		var ciphertext = await getCrypto().subtle.encrypt({
+			name: 'AES-GCM', iv: nonce,
+			additionalData: localPinAad(secretId, ownerId, version), tagLength: 128
+		}, key, encoder().encode(pin));
+		return {
+			protocol: LOCAL_PIN_PROTOCOL,
+			cipher: 'AES-256-GCM',
+			secret_id: normalizeSecretId(secretId),
+			owner_id: String(ownerId || '').trim(),
+			state_version: Number(version),
+			nonce: bytesToBase64Url(nonce),
+			ciphertext: bytesToBase64Url(new Uint8Array(ciphertext))
+		};
+	}
+
+	async function revealLocalPin(envelope, identity, secretId, ownerId, version) {
+		if (!envelope || envelope.protocol !== LOCAL_PIN_PROTOCOL || envelope.cipher !== 'AES-256-GCM' ||
+			envelope.secret_id !== normalizeSecretId(secretId) || envelope.owner_id !== String(ownerId || '').trim() ||
+			Number(envelope.state_version) !== Number(version)) {
+			throw new Error('The locally protected Keylink PIN does not match this ownership state.');
+		}
+		var key = await deriveLocalPinKey(identity, secretId, ownerId, version);
+		try {
+			var plaintext = await getCrypto().subtle.decrypt({
+				name: 'AES-GCM', iv: assertLength('Local PIN nonce', base64UrlToBytes(envelope.nonce), 12),
+				additionalData: localPinAad(secretId, ownerId, version), tagLength: 128
+			}, key, base64UrlToBytes(envelope.ciphertext));
+			var pin = decoder().decode(plaintext);
+			if (!/^\d{6}$/.test(pin)) { throw new Error('The locally protected Keylink PIN is invalid.'); }
+			return pin;
+		} catch (error) {
+			throw new Error('Unable to reveal the locally protected Keylink PIN.');
+		}
+	}
+
 	async function createKlt1Payload(transfer) {
 		var secretId = normalizeSecretId(transfer && transfer.secret_id);
 		var version = Number(transfer && transfer.new_state_version);
@@ -428,6 +514,7 @@
 		KLT1_PREFIX: KLT1_PREFIX,
 		MAX_SECRET_LENGTH: MAX_SECRET_LENGTH,
 		IDENTITY_BACKUP_PROTOCOL: IDENTITY_BACKUP_PROTOCOL,
+		LOCAL_PIN_PROTOCOL: LOCAL_PIN_PROTOCOL,
 		bytesToBase64Url: bytesToBase64Url,
 		base64UrlToBytes: base64UrlToBytes,
 		bytesToHex: bytesToHex,
@@ -438,7 +525,9 @@
 		sha256Hex: sha256Hex,
 		createSecretId: createSecretId,
 		createSecretUri: createSecretUri,
+		parseSecretUriDetails: parseSecretUriDetails,
 		parseSecretUri: parseSecretUri,
+		generatePin: generatePin,
 		generateIdentity: generateIdentity,
 		exportPublicKey: exportPublicKey,
 		exportPrivateKey: exportPrivateKey,
@@ -449,6 +538,8 @@
 		wrapContentKey: wrapContentKey,
 		unwrapContentKey: unwrapContentKey,
 		rewrapOwnerEnvelope: rewrapOwnerEnvelope,
+		protectLocalPin: protectLocalPin,
+		revealLocalPin: revealLocalPin,
 		createKlt1Payload: createKlt1Payload,
 		createKlt1Hex: createKlt1Hex,
 		exportIdentityBackup: exportIdentityBackup,
