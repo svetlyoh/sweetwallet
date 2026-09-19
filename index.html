@@ -50,6 +50,9 @@
 					</div>
 				</div>
 				<div class="header-actions">
+					<button id="headerAvatarButton" class="noverel-avatar-button header-avatar hidden" type="button" aria-label="View your Avatar by Noverel">
+						<img id="headerAvatarImage" alt="">
+					</button>
 					<button id="refreshBalance" class="balance-chip" type="button" title="Refresh live balance">
 						<span id="balanceChipAmount" class="amount">0</span>
 						<span id="balanceChipTicker" class="ticker">SUGAR</span>
@@ -63,6 +66,10 @@
 			<main>
 				<section id="loginScreen" class="screen active">
 					<div class="login-card">
+						<div id="loginAvatarWrap" class="login-avatar-wrap hidden">
+							<div class="noverel-avatar-preview login-avatar-preview"><img id="loginAvatarImage" alt=""></div>
+							<span>Avatar by Noverel</span>
+						</div>
 						<div class="login-title-row">
 							<div class="login-heading">
 								<div class="login-eyebrow"><i data-lucide="shield-check"></i><span>Local &amp; encrypted</span></div>
@@ -179,6 +186,10 @@
 
 							<div class="panel locked-panel" data-panel="locked">
 								<div class="login-card locked-login-card">
+									<div id="lockedAvatarWrap" class="login-avatar-wrap hidden">
+										<div class="noverel-avatar-preview login-avatar-preview"><img id="lockedAvatarImage" alt=""></div>
+										<span>Avatar by Noverel</span>
+									</div>
 									<div class="login-title-row locked-title-row">
 										<div>
 											<p class="login-copy">Unlock your saved wallet.</p>
@@ -408,6 +419,13 @@
 
 							<div class="panel" data-panel="settings">
 								<h2>Settings</h2>
+								<div class="avatar-setting-row">
+									<div class="avatar-setting-copy">
+										<div id="settingsAvatarPreview" class="noverel-avatar-preview avatar-preview-small"><i data-lucide="user-round"></i></div>
+										<div><strong>Avatar by Noverel</strong><small id="settingsAvatarName">Not set on this browser</small><small>A familiar browser picture—not an account, identity check, or KYC.</small></div>
+									</div>
+									<button id="settingsChooseAvatar" class="button subtle avatar-setting-button" type="button">Choose Avatar</button>
+								</div>
 								<form id="backendForm" autocomplete="off">
 									<div class="form-row">
 										<label for="backendInput">Sugarchain API backend</label>
@@ -641,6 +659,7 @@
 					<button class="menu-item" type="button" data-tab="keys"><i data-lucide="key-round"></i>Keys</button>
 					<button class="menu-item" type="button" data-tab="broadcast"><i data-lucide="radio"></i>Broadcast</button>
 					<button class="menu-item" type="button" data-tab="settings"><i data-lucide="settings"></i>Settings</button>
+					<button id="menuChooseAvatar" class="menu-item" type="button"><i data-lucide="circle-user-round"></i><span>Choose Avatar</span></button>
 					<button class="menu-item" type="button" data-tab="activity"><i data-lucide="history"></i>Explorer History</button>
 					<button id="menuSetupPinButton" class="menu-item menu-pin-setup" type="button">
 						<i data-lucide="shield-plus"></i>
@@ -884,6 +903,50 @@
 			</form>
 		</div>
 
+		<div id="avatarPromptModal" class="modal avatar-prompt-modal" role="dialog" aria-modal="true" aria-labelledby="avatarPromptTitle">
+			<div class="modal-card avatar-prompt-card">
+				<div class="noverel-avatar-preview avatar-prompt-placeholder"><i data-lucide="circle-user-round"></i></div>
+				<div class="login-eyebrow">Avatar by Noverel</div>
+				<h2 id="avatarPromptTitle">Add a familiar picture?</h2>
+				<p>Choose an optional picture stored on this device in your browser. Noverel does not manage it, and it never replaces your PIN or password.</p>
+				<div class="modal-actions">
+					<button id="skipAvatarPrompt" class="button secondary" type="button">Not Now</button>
+					<button id="startAvatarPrompt" class="button" type="button">Choose Avatar</button>
+				</div>
+			</div>
+		</div>
+
+		<div id="avatarPickerModal" class="modal avatar-picker-modal" role="dialog" aria-modal="true" aria-labelledby="avatarPickerTitle">
+			<div class="modal-card avatar-picker-card">
+				<div class="avatar-modal-header">
+					<div><div class="login-eyebrow">Avatar by Noverel</div><h2 id="avatarPickerTitle">Choose your browser avatar</h2></div>
+					<button id="closeAvatarPicker" class="icon-button" type="button" aria-label="Close Avatar by Noverel picker"><i data-lucide="x"></i></button>
+				</div>
+				<p>Pick a familiar picture to recognize when you return.</p>
+				<div class="avatar-noverel-note">
+					<p><strong>Simple and private.</strong> This is just a picture record saved locally in this browser, much like a Chrome profile image. Noverel does not manage it. It does not create an account and it is not identity verification, tracking, or KYC.</p>
+					<p>The same friendly avatar collection is available in <a href="https://sweetwallet.net/" target="_blank" rel="noopener noreferrer">Sweetwallet</a>, <a href="https://lingry.net/#/" target="_blank" rel="noopener noreferrer">Lingry</a>, <a href="https://typexc.com/" target="_blank" rel="noopener noreferrer">TypeXc</a>, and <a href="https://openkeylink.app/" target="_blank" rel="noopener noreferrer">Keylink</a>, so you can use the picture you recognize across Noverel apps.</p>
+					<p class="avatar-noverel-credit">Made with <span aria-hidden="true">♥</span> by <a href="https://noverel.net/" target="_blank" rel="noopener noreferrer">Noverel</a></p>
+				</div>
+				<div class="form-row avatar-search"><label for="avatarSearch">Search avatars</label><input id="avatarSearch" type="search" placeholder="Search fox, ocean, space…" autocomplete="off"></div>
+				<div class="avatar-picker-toolbar"><span id="avatarPickerScope">Six suggestions</span><button id="browseAllAvatars" class="avatar-text-button" type="button">Browse all 128</button></div>
+				<div id="avatarGrid" class="noverel-avatar-grid" role="group" aria-label="Avatar by Noverel choices"></div>
+				<p id="avatarEmpty" class="avatar-empty hidden">No avatars match that search.</p>
+				<p id="avatarPickerError" class="avatar-error" role="alert"></p>
+				<div class="modal-actions"><button id="randomAvatar" class="button secondary" type="button"><i data-lucide="shuffle"></i>Pick one for me</button></div>
+			</div>
+		</div>
+
+		<div id="avatarDetailModal" class="modal avatar-detail-modal" role="dialog" aria-modal="true" aria-labelledby="avatarDetailTitle">
+			<div class="modal-card avatar-detail-card">
+				<div class="avatar-modal-header"><div><div class="login-eyebrow">Browser picture</div><h2 id="avatarDetailTitle">Your Avatar by Noverel</h2></div><button id="closeAvatarDetail" class="icon-button" type="button" aria-label="Close avatar details"><i data-lucide="x"></i></button></div>
+				<div id="avatarDetailPreview" class="noverel-avatar-preview avatar-preview-detail"><i data-lucide="user-round"></i></div>
+				<h3 id="avatarDetailName"></h3>
+				<p>This familiar picture record is saved locally on this device in your browser; Noverel does not manage it. It is not an account, authentication method, identity check, tracking, or KYC.</p>
+				<div class="modal-actions"><button id="detailChangeAvatar" class="button secondary" type="button">Change Avatar</button><button id="dismissAvatarDetail" class="button" type="button">Close</button></div>
+			</div>
+		</div>
+
 		<div id="disconnectWalletModal" class="modal disconnect-wallet-modal" role="dialog" aria-modal="true" aria-label="Disconnect SweetWallet">
 			<form id="disconnectWalletForm" class="modal-card disconnect-wallet-card" autocomplete="off">
 				<div class="pin-setup-kicker" id="disconnectStepLabel">Secure disconnect</div>
@@ -928,6 +991,7 @@
 		<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 		<script src="lib/bitcoinjs-4.0.3-browser.js"></script>
 		<script src="wallet-vault.js"></script>
+		<script src="noverel-avatar.js"></script>
 		<script src="sweetwallet.js"></script>
 		<script src="keylink-crypto.js"></script>
 		<script src="keylink-storage.js"></script>

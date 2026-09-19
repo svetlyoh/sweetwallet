@@ -1,0 +1,1544 @@
+[
+  {
+    "id": "amber-fox",
+    "displayName": "Amber Fox",
+    "image": "/avatars/amber-fox.png",
+    "keywords": [
+      "fox",
+      "animal",
+      "orange",
+      "forest",
+      "wildlife"
+    ]
+  },
+  {
+    "id": "silver-wolf",
+    "displayName": "Silver Wolf",
+    "image": "/avatars/silver-wolf.png",
+    "keywords": [
+      "wolf",
+      "animal",
+      "gray",
+      "forest",
+      "canine"
+    ]
+  },
+  {
+    "id": "cinnamon-bear",
+    "displayName": "Cinnamon Bear",
+    "image": "/avatars/cinnamon-bear.png",
+    "keywords": [
+      "bear",
+      "animal",
+      "brown",
+      "forest",
+      "wildlife"
+    ]
+  },
+  {
+    "id": "bamboo-panda",
+    "displayName": "Bamboo Panda",
+    "image": "/avatars/bamboo-panda.png",
+    "keywords": [
+      "panda",
+      "bear",
+      "animal",
+      "black",
+      "white",
+      "bamboo"
+    ]
+  },
+  {
+    "id": "sunset-tiger",
+    "displayName": "Sunset Tiger",
+    "image": "/avatars/sunset-tiger.png",
+    "keywords": [
+      "tiger",
+      "cat",
+      "animal",
+      "orange",
+      "stripes"
+    ]
+  },
+  {
+    "id": "golden-lion",
+    "displayName": "Golden Lion",
+    "image": "/avatars/golden-lion.png",
+    "keywords": [
+      "lion",
+      "cat",
+      "animal",
+      "mane",
+      "gold"
+    ]
+  },
+  {
+    "id": "jungle-leopard",
+    "displayName": "Jungle Leopard",
+    "image": "/avatars/jungle-leopard.png",
+    "keywords": [
+      "leopard",
+      "cat",
+      "animal",
+      "spots",
+      "jungle"
+    ]
+  },
+  {
+    "id": "snow-leopard",
+    "displayName": "Snow Leopard",
+    "image": "/avatars/snow-leopard.png",
+    "keywords": [
+      "snow leopard",
+      "cat",
+      "animal",
+      "white",
+      "spots",
+      "mountain"
+    ]
+  },
+  {
+    "id": "savanna-cheetah",
+    "displayName": "Savanna Cheetah",
+    "image": "/avatars/savanna-cheetah.png",
+    "keywords": [
+      "cheetah",
+      "cat",
+      "animal",
+      "spots",
+      "savanna"
+    ]
+  },
+  {
+    "id": "gray-elephant",
+    "displayName": "Gray Elephant",
+    "image": "/avatars/gray-elephant.png",
+    "keywords": [
+      "elephant",
+      "animal",
+      "gray",
+      "tusks",
+      "savanna"
+    ]
+  },
+  {
+    "id": "stone-rhino",
+    "displayName": "Stone Rhino",
+    "image": "/avatars/stone-rhino.png",
+    "keywords": [
+      "rhino",
+      "rhinoceros",
+      "animal",
+      "gray",
+      "horn"
+    ]
+  },
+  {
+    "id": "acacia-giraffe",
+    "displayName": "Acacia Giraffe",
+    "image": "/avatars/acacia-giraffe.png",
+    "keywords": [
+      "giraffe",
+      "animal",
+      "yellow",
+      "spots",
+      "savanna"
+    ]
+  },
+  {
+    "id": "stripe-zebra",
+    "displayName": "Stripe Zebra",
+    "image": "/avatars/stripe-zebra.png",
+    "keywords": [
+      "zebra",
+      "animal",
+      "black",
+      "white",
+      "stripes"
+    ]
+  },
+  {
+    "id": "northern-moose",
+    "displayName": "Northern Moose",
+    "image": "/avatars/northern-moose.png",
+    "keywords": [
+      "moose",
+      "animal",
+      "brown",
+      "antlers",
+      "forest"
+    ]
+  },
+  {
+    "id": "woodland-deer",
+    "displayName": "Woodland Deer",
+    "image": "/avatars/woodland-deer.png",
+    "keywords": [
+      "deer",
+      "animal",
+      "brown",
+      "antlers",
+      "forest"
+    ]
+  },
+  {
+    "id": "sea-otter",
+    "displayName": "Sea Otter",
+    "image": "/avatars/sea-otter.png",
+    "keywords": [
+      "otter",
+      "animal",
+      "brown",
+      "water",
+      "marine"
+    ]
+  },
+  {
+    "id": "night-raccoon",
+    "displayName": "Night Raccoon",
+    "image": "/avatars/night-raccoon.png",
+    "keywords": [
+      "raccoon",
+      "animal",
+      "gray",
+      "mask",
+      "night"
+    ]
+  },
+  {
+    "id": "river-beaver",
+    "displayName": "River Beaver",
+    "image": "/avatars/river-beaver.png",
+    "keywords": [
+      "beaver",
+      "animal",
+      "brown",
+      "river",
+      "rodent"
+    ]
+  },
+  {
+    "id": "oak-squirrel",
+    "displayName": "Oak Squirrel",
+    "image": "/avatars/oak-squirrel.png",
+    "keywords": [
+      "squirrel",
+      "animal",
+      "orange",
+      "forest",
+      "rodent"
+    ]
+  },
+  {
+    "id": "river-otter",
+    "displayName": "River Otter",
+    "image": "/avatars/river-otter.png",
+    "keywords": [
+      "otter",
+      "animal",
+      "brown",
+      "river",
+      "water"
+    ]
+  },
+  {
+    "id": "meadow-badger",
+    "displayName": "Meadow Badger",
+    "image": "/avatars/meadow-badger.png",
+    "keywords": [
+      "badger",
+      "animal",
+      "black",
+      "white",
+      "forest"
+    ]
+  },
+  {
+    "id": "forest-lynx",
+    "displayName": "Forest Lynx",
+    "image": "/avatars/forest-lynx.png",
+    "keywords": [
+      "lynx",
+      "cat",
+      "animal",
+      "wildcat",
+      "forest"
+    ]
+  },
+  {
+    "id": "mountain-bobcat",
+    "displayName": "Mountain Bobcat",
+    "image": "/avatars/mountain-bobcat.png",
+    "keywords": [
+      "bobcat",
+      "cat",
+      "animal",
+      "wildcat",
+      "mountain"
+    ]
+  },
+  {
+    "id": "gray-wolf",
+    "displayName": "Gray Wolf",
+    "image": "/avatars/gray-wolf.png",
+    "keywords": [
+      "wolf",
+      "animal",
+      "gray",
+      "forest",
+      "canine"
+    ]
+  },
+  {
+    "id": "arctic-husky",
+    "displayName": "Arctic Husky",
+    "image": "/avatars/arctic-husky.png",
+    "keywords": [
+      "husky",
+      "dog",
+      "animal",
+      "black",
+      "white",
+      "arctic"
+    ]
+  },
+  {
+    "id": "shiba-inu",
+    "displayName": "Shiba Inu",
+    "image": "/avatars/shiba-inu.png",
+    "keywords": [
+      "shiba",
+      "dog",
+      "animal",
+      "orange",
+      "canine"
+    ]
+  },
+  {
+    "id": "alpine-dog",
+    "displayName": "Alpine Dog",
+    "image": "/avatars/alpine-dog.png",
+    "keywords": [
+      "dog",
+      "bernese",
+      "animal",
+      "black",
+      "brown",
+      "mountain"
+    ]
+  },
+  {
+    "id": "golden-retriever",
+    "displayName": "Golden Retriever",
+    "image": "/avatars/golden-retriever.png",
+    "keywords": [
+      "retriever",
+      "dog",
+      "animal",
+      "golden",
+      "canine"
+    ]
+  },
+  {
+    "id": "boston-terrier",
+    "displayName": "Boston Terrier",
+    "image": "/avatars/boston-terrier.png",
+    "keywords": [
+      "terrier",
+      "dog",
+      "animal",
+      "black",
+      "white"
+    ]
+  },
+  {
+    "id": "midnight-cat",
+    "displayName": "Midnight Cat",
+    "image": "/avatars/midnight-cat.png",
+    "keywords": [
+      "cat",
+      "animal",
+      "black",
+      "pet",
+      "feline"
+    ]
+  },
+  {
+    "id": "snow-cat",
+    "displayName": "Snow Cat",
+    "image": "/avatars/snow-cat.png",
+    "keywords": [
+      "cat",
+      "animal",
+      "white",
+      "pet",
+      "feline"
+    ]
+  },
+  {
+    "id": "ginger-cat",
+    "displayName": "Ginger Cat",
+    "image": "/avatars/ginger-cat.png",
+    "keywords": [
+      "cat",
+      "animal",
+      "orange",
+      "ginger",
+      "pet"
+    ]
+  },
+  {
+    "id": "great-horned-owl",
+    "displayName": "Great Horned Owl",
+    "image": "/avatars/great-horned-owl.png",
+    "keywords": [
+      "owl",
+      "bird",
+      "brown",
+      "night",
+      "raptor"
+    ]
+  },
+  {
+    "id": "barn-owl",
+    "displayName": "Barn Owl",
+    "image": "/avatars/barn-owl.png",
+    "keywords": [
+      "owl",
+      "bird",
+      "white",
+      "brown",
+      "night"
+    ]
+  },
+  {
+    "id": "bald-eagle",
+    "displayName": "Bald Eagle",
+    "image": "/avatars/bald-eagle.png",
+    "keywords": [
+      "eagle",
+      "bird",
+      "white",
+      "brown",
+      "raptor"
+    ]
+  },
+  {
+    "id": "desert-hawk",
+    "displayName": "Desert Hawk",
+    "image": "/avatars/desert-hawk.png",
+    "keywords": [
+      "hawk",
+      "bird",
+      "brown",
+      "raptor",
+      "desert"
+    ]
+  },
+  {
+    "id": "peregrine-falcon",
+    "displayName": "Peregrine Falcon",
+    "image": "/avatars/peregrine-falcon.png",
+    "keywords": [
+      "falcon",
+      "bird",
+      "raptor",
+      "gray",
+      "sky"
+    ]
+  },
+  {
+    "id": "raven",
+    "displayName": "Raven",
+    "image": "/avatars/raven.png",
+    "keywords": [
+      "raven",
+      "bird",
+      "black",
+      "corvid",
+      "night"
+    ]
+  },
+  {
+    "id": "crow",
+    "displayName": "Crow",
+    "image": "/avatars/crow.png",
+    "keywords": [
+      "crow",
+      "bird",
+      "black",
+      "corvid",
+      "sky"
+    ]
+  },
+  {
+    "id": "blue-jay",
+    "displayName": "Blue Jay",
+    "image": "/avatars/blue-jay.png",
+    "keywords": [
+      "blue jay",
+      "bird",
+      "blue",
+      "feathers",
+      "forest"
+    ]
+  },
+  {
+    "id": "cardinal",
+    "displayName": "Cardinal",
+    "image": "/avatars/cardinal.png",
+    "keywords": [
+      "cardinal",
+      "bird",
+      "red",
+      "feathers",
+      "forest"
+    ]
+  },
+  {
+    "id": "hummingbird",
+    "displayName": "Hummingbird",
+    "image": "/avatars/hummingbird.png",
+    "keywords": [
+      "hummingbird",
+      "bird",
+      "green",
+      "purple",
+      "flower"
+    ]
+  },
+  {
+    "id": "woodpecker",
+    "displayName": "Woodpecker",
+    "image": "/avatars/woodpecker.png",
+    "keywords": [
+      "woodpecker",
+      "bird",
+      "red",
+      "black",
+      "forest"
+    ]
+  },
+  {
+    "id": "emperor-penguin",
+    "displayName": "Emperor Penguin",
+    "image": "/avatars/emperor-penguin.png",
+    "keywords": [
+      "penguin",
+      "bird",
+      "black",
+      "white",
+      "ice"
+    ]
+  },
+  {
+    "id": "atlantic-puffin",
+    "displayName": "Atlantic Puffin",
+    "image": "/avatars/atlantic-puffin.png",
+    "keywords": [
+      "puffin",
+      "bird",
+      "black",
+      "white",
+      "orange"
+    ]
+  },
+  {
+    "id": "seagull",
+    "displayName": "Seagull",
+    "image": "/avatars/seagull.png",
+    "keywords": [
+      "seagull",
+      "bird",
+      "white",
+      "gray",
+      "ocean"
+    ]
+  },
+  {
+    "id": "blue-heron",
+    "displayName": "Blue Heron",
+    "image": "/avatars/blue-heron.png",
+    "keywords": [
+      "heron",
+      "bird",
+      "blue",
+      "gray",
+      "water"
+    ]
+  },
+  {
+    "id": "kingfisher",
+    "displayName": "Kingfisher",
+    "image": "/avatars/kingfisher.png",
+    "keywords": [
+      "kingfisher",
+      "bird",
+      "blue",
+      "orange",
+      "water"
+    ]
+  },
+  {
+    "id": "bottlenose-dolphin",
+    "displayName": "Bottlenose Dolphin",
+    "image": "/avatars/bottlenose-dolphin.png",
+    "keywords": [
+      "dolphin",
+      "animal",
+      "blue",
+      "ocean",
+      "marine"
+    ]
+  },
+  {
+    "id": "blue-whale",
+    "displayName": "Blue Whale",
+    "image": "/avatars/blue-whale.png",
+    "keywords": [
+      "whale",
+      "animal",
+      "blue",
+      "ocean",
+      "marine"
+    ]
+  },
+  {
+    "id": "orca",
+    "displayName": "Orca",
+    "image": "/avatars/orca.png",
+    "keywords": [
+      "orca",
+      "whale",
+      "animal",
+      "black",
+      "white",
+      "ocean"
+    ]
+  },
+  {
+    "id": "reef-shark",
+    "displayName": "Reef Shark",
+    "image": "/avatars/reef-shark.png",
+    "keywords": [
+      "shark",
+      "animal",
+      "blue",
+      "ocean",
+      "marine"
+    ]
+  },
+  {
+    "id": "green-sea-turtle",
+    "displayName": "Green Sea Turtle",
+    "image": "/avatars/green-sea-turtle.png",
+    "keywords": [
+      "turtle",
+      "animal",
+      "green",
+      "ocean",
+      "marine"
+    ]
+  },
+  {
+    "id": "coral-octopus",
+    "displayName": "Coral Octopus",
+    "image": "/avatars/coral-octopus.png",
+    "keywords": [
+      "octopus",
+      "animal",
+      "coral",
+      "ocean",
+      "tentacles"
+    ]
+  },
+  {
+    "id": "moon-jellyfish",
+    "displayName": "Moon Jellyfish",
+    "image": "/avatars/moon-jellyfish.png",
+    "keywords": [
+      "jellyfish",
+      "animal",
+      "blue",
+      "ocean",
+      "marine"
+    ]
+  },
+  {
+    "id": "reef-seahorse",
+    "displayName": "Reef Seahorse",
+    "image": "/avatars/reef-seahorse.png",
+    "keywords": [
+      "seahorse",
+      "animal",
+      "yellow",
+      "reef",
+      "ocean"
+    ]
+  },
+  {
+    "id": "orange-starfish",
+    "displayName": "Orange Starfish",
+    "image": "/avatars/orange-starfish.png",
+    "keywords": [
+      "starfish",
+      "animal",
+      "orange",
+      "ocean",
+      "reef"
+    ]
+  },
+  {
+    "id": "red-crab",
+    "displayName": "Red Crab",
+    "image": "/avatars/red-crab.png",
+    "keywords": [
+      "crab",
+      "animal",
+      "red",
+      "ocean",
+      "shellfish"
+    ]
+  },
+  {
+    "id": "red-lobster",
+    "displayName": "Red Lobster",
+    "image": "/avatars/red-lobster.png",
+    "keywords": [
+      "lobster",
+      "animal",
+      "red",
+      "ocean",
+      "shellfish"
+    ]
+  },
+  {
+    "id": "stingray",
+    "displayName": "Stingray",
+    "image": "/avatars/stingray.png",
+    "keywords": [
+      "stingray",
+      "ray",
+      "animal",
+      "blue",
+      "ocean"
+    ]
+  },
+  {
+    "id": "manta-ray",
+    "displayName": "Manta Ray",
+    "image": "/avatars/manta-ray.png",
+    "keywords": [
+      "manta",
+      "ray",
+      "animal",
+      "blue",
+      "ocean"
+    ]
+  },
+  {
+    "id": "red-squid",
+    "displayName": "Red Squid",
+    "image": "/avatars/red-squid.png",
+    "keywords": [
+      "squid",
+      "animal",
+      "red",
+      "ocean",
+      "tentacles"
+    ]
+  },
+  {
+    "id": "narwhal",
+    "displayName": "Narwhal",
+    "image": "/avatars/narwhal.png",
+    "keywords": [
+      "narwhal",
+      "whale",
+      "animal",
+      "blue",
+      "tusk",
+      "ocean"
+    ]
+  },
+  {
+    "id": "beluga-whale",
+    "displayName": "Beluga Whale",
+    "image": "/avatars/beluga-whale.png",
+    "keywords": [
+      "beluga",
+      "whale",
+      "animal",
+      "white",
+      "ocean"
+    ]
+  },
+  {
+    "id": "tree-frog",
+    "displayName": "Tree Frog",
+    "image": "/avatars/tree-frog.png",
+    "keywords": [
+      "frog",
+      "animal",
+      "green",
+      "amphibian",
+      "rainforest"
+    ]
+  },
+  {
+    "id": "red-eyed-frog",
+    "displayName": "Red-Eyed Frog",
+    "image": "/avatars/red-eyed-frog.png",
+    "keywords": [
+      "frog",
+      "animal",
+      "green",
+      "red eyes",
+      "amphibian"
+    ]
+  },
+  {
+    "id": "monitor-lizard",
+    "displayName": "Monitor Lizard",
+    "image": "/avatars/monitor-lizard.png",
+    "keywords": [
+      "lizard",
+      "animal",
+      "green",
+      "reptile",
+      "monitor"
+    ]
+  },
+  {
+    "id": "green-iguana",
+    "displayName": "Green Iguana",
+    "image": "/avatars/green-iguana.png",
+    "keywords": [
+      "iguana",
+      "lizard",
+      "animal",
+      "green",
+      "reptile"
+    ]
+  },
+  {
+    "id": "rainbow-chameleon",
+    "displayName": "Rainbow Chameleon",
+    "image": "/avatars/rainbow-chameleon.png",
+    "keywords": [
+      "chameleon",
+      "lizard",
+      "animal",
+      "colorful",
+      "reptile"
+    ]
+  },
+  {
+    "id": "sand-gecko",
+    "displayName": "Sand Gecko",
+    "image": "/avatars/sand-gecko.png",
+    "keywords": [
+      "gecko",
+      "lizard",
+      "animal",
+      "orange",
+      "reptile"
+    ]
+  },
+  {
+    "id": "garden-snake",
+    "displayName": "Garden Snake",
+    "image": "/avatars/garden-snake.png",
+    "keywords": [
+      "snake",
+      "animal",
+      "green",
+      "reptile",
+      "serpent"
+    ]
+  },
+  {
+    "id": "crocodile",
+    "displayName": "Crocodile",
+    "image": "/avatars/crocodile.png",
+    "keywords": [
+      "crocodile",
+      "animal",
+      "green",
+      "reptile",
+      "water"
+    ]
+  },
+  {
+    "id": "green-skink",
+    "displayName": "Green Skink",
+    "image": "/avatars/green-skink.png",
+    "keywords": [
+      "skink",
+      "lizard",
+      "animal",
+      "green",
+      "reptile"
+    ]
+  },
+  {
+    "id": "blue-butterfly",
+    "displayName": "Blue Butterfly",
+    "image": "/avatars/blue-butterfly.png",
+    "keywords": [
+      "butterfly",
+      "insect",
+      "blue",
+      "wings",
+      "garden"
+    ]
+  },
+  {
+    "id": "blue-dragonfly",
+    "displayName": "Blue Dragonfly",
+    "image": "/avatars/blue-dragonfly.png",
+    "keywords": [
+      "dragonfly",
+      "insect",
+      "blue",
+      "wings",
+      "pond"
+    ]
+  },
+  {
+    "id": "red-ladybug",
+    "displayName": "Red Ladybug",
+    "image": "/avatars/red-ladybug.png",
+    "keywords": [
+      "ladybug",
+      "insect",
+      "red",
+      "black",
+      "garden"
+    ]
+  },
+  {
+    "id": "honey-bee",
+    "displayName": "Honey Bee",
+    "image": "/avatars/honey-bee.png",
+    "keywords": [
+      "bee",
+      "insect",
+      "yellow",
+      "black",
+      "honey"
+    ]
+  },
+  {
+    "id": "praying-mantis",
+    "displayName": "Praying Mantis",
+    "image": "/avatars/praying-mantis.png",
+    "keywords": [
+      "mantis",
+      "insect",
+      "green",
+      "garden",
+      "wildlife"
+    ]
+  },
+  {
+    "id": "black-scorpion",
+    "displayName": "Black Scorpion",
+    "image": "/avatars/black-scorpion.png",
+    "keywords": [
+      "scorpion",
+      "arachnid",
+      "black",
+      "desert",
+      "animal"
+    ]
+  },
+  {
+    "id": "black-spider",
+    "displayName": "Black Spider",
+    "image": "/avatars/black-spider.png",
+    "keywords": [
+      "spider",
+      "arachnid",
+      "black",
+      "web",
+      "animal"
+    ]
+  },
+  {
+    "id": "crimson-dragon",
+    "displayName": "Crimson Dragon",
+    "image": "/avatars/crimson-dragon.png",
+    "keywords": [
+      "dragon",
+      "fantasy",
+      "red",
+      "mythical",
+      "creature"
+    ]
+  },
+  {
+    "id": "fire-phoenix",
+    "displayName": "Fire Phoenix",
+    "image": "/avatars/fire-phoenix.png",
+    "keywords": [
+      "phoenix",
+      "fantasy",
+      "orange",
+      "fire",
+      "bird"
+    ]
+  },
+  {
+    "id": "silver-unicorn",
+    "displayName": "Silver Unicorn",
+    "image": "/avatars/silver-unicorn.png",
+    "keywords": [
+      "unicorn",
+      "fantasy",
+      "white",
+      "horse",
+      "mythical"
+    ]
+  },
+  {
+    "id": "golden-griffin",
+    "displayName": "Golden Griffin",
+    "image": "/avatars/golden-griffin.png",
+    "keywords": [
+      "griffin",
+      "fantasy",
+      "gold",
+      "eagle",
+      "lion"
+    ]
+  },
+  {
+    "id": "white-pegasus",
+    "displayName": "White Pegasus",
+    "image": "/avatars/white-pegasus.png",
+    "keywords": [
+      "pegasus",
+      "fantasy",
+      "white",
+      "winged horse",
+      "mythical"
+    ]
+  },
+  {
+    "id": "blue-hydra",
+    "displayName": "Blue Hydra",
+    "image": "/avatars/blue-hydra.png",
+    "keywords": [
+      "hydra",
+      "fantasy",
+      "blue",
+      "dragon",
+      "mythical"
+    ]
+  },
+  {
+    "id": "purple-kraken",
+    "displayName": "Purple Kraken",
+    "image": "/avatars/purple-kraken.png",
+    "keywords": [
+      "kraken",
+      "fantasy",
+      "purple",
+      "octopus",
+      "mythical"
+    ]
+  },
+  {
+    "id": "ice-yeti",
+    "displayName": "Ice Yeti",
+    "image": "/avatars/ice-yeti.png",
+    "keywords": [
+      "yeti",
+      "fantasy",
+      "white",
+      "snow",
+      "mythical"
+    ]
+  },
+  {
+    "id": "forest-bigfoot",
+    "displayName": "Forest Bigfoot",
+    "image": "/avatars/forest-bigfoot.png",
+    "keywords": [
+      "bigfoot",
+      "fantasy",
+      "brown",
+      "forest",
+      "mythical"
+    ]
+  },
+  {
+    "id": "moon-fairy",
+    "displayName": "Moon Fairy",
+    "image": "/avatars/moon-fairy.png",
+    "keywords": [
+      "fairy",
+      "fantasy",
+      "wings",
+      "magic",
+      "mythical"
+    ]
+  },
+  {
+    "id": "violet-wizard-hat",
+    "displayName": "Violet Wizard Hat",
+    "image": "/avatars/violet-wizard-hat.png",
+    "keywords": [
+      "wizard",
+      "hat",
+      "fantasy",
+      "purple",
+      "magic"
+    ]
+  },
+  {
+    "id": "silver-alien",
+    "displayName": "Silver Alien",
+    "image": "/avatars/silver-alien.png",
+    "keywords": [
+      "alien",
+      "space",
+      "silver",
+      "ufo",
+      "sci-fi"
+    ]
+  },
+  {
+    "id": "blue-robot",
+    "displayName": "Blue Robot",
+    "image": "/avatars/blue-robot.png",
+    "keywords": [
+      "robot",
+      "technology",
+      "blue",
+      "sci-fi",
+      "machine"
+    ]
+  },
+  {
+    "id": "space-astronaut",
+    "displayName": "Space Astronaut",
+    "image": "/avatars/space-astronaut.png",
+    "keywords": [
+      "astronaut",
+      "space",
+      "helmet",
+      "sci-fi",
+      "explorer"
+    ]
+  },
+  {
+    "id": "red-rocket",
+    "displayName": "Red Rocket",
+    "image": "/avatars/red-rocket.png",
+    "keywords": [
+      "rocket",
+      "space",
+      "red",
+      "launch",
+      "spaceship"
+    ]
+  },
+  {
+    "id": "green-ufo",
+    "displayName": "Green UFO",
+    "image": "/avatars/green-ufo.png",
+    "keywords": [
+      "ufo",
+      "space",
+      "green",
+      "alien",
+      "spaceship"
+    ]
+  },
+  {
+    "id": "golden-sun",
+    "displayName": "Golden Sun",
+    "image": "/avatars/golden-sun.png",
+    "keywords": [
+      "sun",
+      "space",
+      "yellow",
+      "star",
+      "sky"
+    ]
+  },
+  {
+    "id": "silver-moon",
+    "displayName": "Silver Moon",
+    "image": "/avatars/silver-moon.png",
+    "keywords": [
+      "moon",
+      "space",
+      "silver",
+      "night",
+      "lunar"
+    ]
+  },
+  {
+    "id": "planet-earth",
+    "displayName": "Planet Earth",
+    "image": "/avatars/planet-earth.png",
+    "keywords": [
+      "earth",
+      "planet",
+      "space",
+      "blue",
+      "green"
+    ]
+  },
+  {
+    "id": "red-mars",
+    "displayName": "Red Mars",
+    "image": "/avatars/red-mars.png",
+    "keywords": [
+      "mars",
+      "planet",
+      "space",
+      "red",
+      "astronomy"
+    ]
+  },
+  {
+    "id": "giant-jupiter",
+    "displayName": "Giant Jupiter",
+    "image": "/avatars/giant-jupiter.png",
+    "keywords": [
+      "jupiter",
+      "planet",
+      "space",
+      "gas giant",
+      "astronomy"
+    ]
+  },
+  {
+    "id": "ringed-saturn",
+    "displayName": "Ringed Saturn",
+    "image": "/avatars/ringed-saturn.png",
+    "keywords": [
+      "saturn",
+      "planet",
+      "space",
+      "rings",
+      "astronomy"
+    ]
+  },
+  {
+    "id": "blue-neptune",
+    "displayName": "Blue Neptune",
+    "image": "/avatars/blue-neptune.png",
+    "keywords": [
+      "neptune",
+      "planet",
+      "space",
+      "blue",
+      "astronomy"
+    ]
+  },
+  {
+    "id": "spiral-galaxy",
+    "displayName": "Spiral Galaxy",
+    "image": "/avatars/spiral-galaxy.png",
+    "keywords": [
+      "galaxy",
+      "space",
+      "stars",
+      "spiral",
+      "astronomy"
+    ]
+  },
+  {
+    "id": "black-hole",
+    "displayName": "Black Hole",
+    "image": "/avatars/black-hole.png",
+    "keywords": [
+      "black hole",
+      "space",
+      "astronomy",
+      "dark",
+      "gravity"
+    ]
+  },
+  {
+    "id": "purple-nebula",
+    "displayName": "Purple Nebula",
+    "image": "/avatars/purple-nebula.png",
+    "keywords": [
+      "nebula",
+      "space",
+      "purple",
+      "stars",
+      "astronomy"
+    ]
+  },
+  {
+    "id": "blue-comet",
+    "displayName": "Blue Comet",
+    "image": "/avatars/blue-comet.png",
+    "keywords": [
+      "comet",
+      "space",
+      "blue",
+      "tail",
+      "astronomy"
+    ]
+  },
+  {
+    "id": "fire-meteor",
+    "displayName": "Fire Meteor",
+    "image": "/avatars/fire-meteor.png",
+    "keywords": [
+      "meteor",
+      "space",
+      "fire",
+      "rock",
+      "astronomy"
+    ]
+  },
+  {
+    "id": "northern-aurora",
+    "displayName": "Northern Aurora",
+    "image": "/avatars/northern-aurora.png",
+    "keywords": [
+      "aurora",
+      "northern lights",
+      "sky",
+      "green",
+      "night"
+    ]
+  },
+  {
+    "id": "snow-mountain",
+    "displayName": "Snow Mountain",
+    "image": "/avatars/snow-mountain.png",
+    "keywords": [
+      "mountain",
+      "snow",
+      "nature",
+      "peak",
+      "landscape"
+    ]
+  },
+  {
+    "id": "lava-volcano",
+    "displayName": "Lava Volcano",
+    "image": "/avatars/lava-volcano.png",
+    "keywords": [
+      "volcano",
+      "lava",
+      "mountain",
+      "red",
+      "nature"
+    ]
+  },
+  {
+    "id": "forest-waterfall",
+    "displayName": "Forest Waterfall",
+    "image": "/avatars/forest-waterfall.png",
+    "keywords": [
+      "waterfall",
+      "water",
+      "forest",
+      "nature",
+      "blue"
+    ]
+  },
+  {
+    "id": "evergreen-forest",
+    "displayName": "Evergreen Forest",
+    "image": "/avatars/evergreen-forest.png",
+    "keywords": [
+      "forest",
+      "trees",
+      "nature",
+      "green",
+      "evergreen"
+    ]
+  },
+  {
+    "id": "pine-grove",
+    "displayName": "Pine Grove",
+    "image": "/avatars/pine-grove.png",
+    "keywords": [
+      "pine",
+      "trees",
+      "forest",
+      "green",
+      "nature"
+    ]
+  },
+  {
+    "id": "desert-dunes",
+    "displayName": "Desert Dunes",
+    "image": "/avatars/desert-dunes.png",
+    "keywords": [
+      "desert",
+      "dunes",
+      "sand",
+      "nature",
+      "landscape"
+    ]
+  },
+  {
+    "id": "desert-cactus",
+    "displayName": "Desert Cactus",
+    "image": "/avatars/desert-cactus.png",
+    "keywords": [
+      "cactus",
+      "plant",
+      "green",
+      "desert",
+      "succulent"
+    ]
+  },
+  {
+    "id": "tropical-beach",
+    "displayName": "Tropical Beach",
+    "image": "/avatars/tropical-beach.png",
+    "keywords": [
+      "beach",
+      "palm",
+      "ocean",
+      "tropical",
+      "sand"
+    ]
+  },
+  {
+    "id": "ocean-wave",
+    "displayName": "Ocean Wave",
+    "image": "/avatars/ocean-wave.png",
+    "keywords": [
+      "wave",
+      "ocean",
+      "water",
+      "blue",
+      "sea"
+    ]
+  },
+  {
+    "id": "palm-island",
+    "displayName": "Palm Island",
+    "image": "/avatars/palm-island.png",
+    "keywords": [
+      "island",
+      "palm",
+      "ocean",
+      "tropical",
+      "beach"
+    ]
+  },
+  {
+    "id": "red-lighthouse",
+    "displayName": "Red Lighthouse",
+    "image": "/avatars/red-lighthouse.png",
+    "keywords": [
+      "lighthouse",
+      "ocean",
+      "red",
+      "coast",
+      "navigation"
+    ]
+  },
+  {
+    "id": "forest-cabin",
+    "displayName": "Forest Cabin",
+    "image": "/avatars/forest-cabin.png",
+    "keywords": [
+      "cabin",
+      "forest",
+      "house",
+      "wood",
+      "nature"
+    ]
+  },
+  {
+    "id": "orange-tent",
+    "displayName": "Orange Tent",
+    "image": "/avatars/orange-tent.png",
+    "keywords": [
+      "tent",
+      "camping",
+      "orange",
+      "outdoors",
+      "travel"
+    ]
+  },
+  {
+    "id": "campfire",
+    "displayName": "Campfire",
+    "image": "/avatars/campfire.png",
+    "keywords": [
+      "campfire",
+      "fire",
+      "camping",
+      "outdoors",
+      "orange"
+    ]
+  },
+  {
+    "id": "suspension-bridge",
+    "displayName": "Suspension Bridge",
+    "image": "/avatars/suspension-bridge.png",
+    "keywords": [
+      "bridge",
+      "travel",
+      "landmark",
+      "engineering",
+      "city"
+    ]
+  },
+  {
+    "id": "stone-castle",
+    "displayName": "Stone Castle",
+    "image": "/avatars/stone-castle.png",
+    "keywords": [
+      "castle",
+      "landmark",
+      "stone",
+      "medieval",
+      "building"
+    ]
+  },
+  {
+    "id": "dutch-windmill",
+    "displayName": "Dutch Windmill",
+    "image": "/avatars/dutch-windmill.png",
+    "keywords": [
+      "windmill",
+      "landmark",
+      "dutch",
+      "building",
+      "travel"
+    ]
+  },
+  {
+    "id": "red-pagoda",
+    "displayName": "Red Pagoda",
+    "image": "/avatars/red-pagoda.png",
+    "keywords": [
+      "pagoda",
+      "landmark",
+      "red",
+      "asian",
+      "temple"
+    ]
+  },
+  {
+    "id": "torii-gate",
+    "displayName": "Torii Gate",
+    "image": "/avatars/torii-gate.png",
+    "keywords": [
+      "torii",
+      "gate",
+      "red",
+      "japanese",
+      "landmark"
+    ]
+  }
+]

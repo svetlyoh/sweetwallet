@@ -29,12 +29,15 @@
 	};
 
 	var Vault = window.SweetWalletVault;
+	var Avatar = window.NoverelAvatar;
+	var avatarManager = null;
 	var STORAGE = {
 		vault: 'sweetwallet_vault_v1',
 		publicWallet: 'sweetwallet_public_wallet_v1',
 		settings: 'sweetwallet_security_settings_v1',
 		securityKeys: 'sweetwallet_security_keys_v1',
-		recoveryCodes: 'sweetwallet_recovery_codes_v1'
+		recoveryCodes: 'sweetwallet_recovery_codes_v1',
+		avatarPrompted: 'sweetwallet_avatar_prompted_v1'
 	};
 
 	var state = {
@@ -87,7 +90,12 @@
 			step: 'password',
 			backupWif: ''
 		},
-		starterFundingRequested: {}
+		starterFundingRequested: {},
+		avatar: {
+			browseAll: false,
+			suggestions: [],
+			pickerContext: ''
+		}
 	};
 
 	var $ = function (selector) {
@@ -140,6 +148,193 @@
 			showToast('Device storage is unavailable.', 'danger');
 			return false;
 		}
+	}
+
+	function cachedAvatarProfile() {
+		var profile = avatarManager && avatarManager.getStoredProfile ? avatarManager.getStoredProfile() : storageJsonGet('noverel_avatar_v1', null);
+		if (!profile || profile.schemaVersion !== 1 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(String(profile.avatarId || ''))) {
+			return null;
+		}
+		return profile;
+	}
+
+	function currentAvatar() {
+		var profile = cachedAvatarProfile();
+		if (!profile) {
+			return null;
+		}
+		var catalogEntry = avatarManager && avatarManager.getAvatarById ? avatarManager.getAvatarById(profile.avatarId) : null;
+		if (avatarManager && avatarManager.getCatalog && avatarManager.getCatalog().length && !catalogEntry) {
+			return null;
+		}
+		return catalogEntry || {
+			id: profile.avatarId,
+			displayName: String(profile.displayName || profile.avatarId),
+			imageUrl: '/avatars/' + encodeURIComponent(profile.avatarId) + '.png'
+		};
+	}
+
+	function renderAvatarPreview(selector, entry, fallbackIcon) {
+		var preview = $(selector);
+		if (!preview) {
+			return;
+		}
+		preview.replaceChildren();
+		if (!entry) {
+			var icon = document.createElement('i');
+			icon.setAttribute('data-lucide', fallbackIcon || 'user-round');
+			preview.appendChild(icon);
+			return;
+		}
+		var image = document.createElement('img');
+		image.src = entry.imageUrl || entry.image;
+		image.alt = entry.displayName + ' — Avatar by Noverel';
+		image.addEventListener('error', function () {
+			preview.replaceChildren();
+			var fallback = document.createElement('i');
+			fallback.setAttribute('data-lucide', fallbackIcon || 'user-round');
+			preview.appendChild(fallback);
+			if (window.lucide) { window.lucide.createIcons(); }
+		}, { once: true });
+		preview.appendChild(image);
+	}
+
+	function renderAvatarSurfaces() {
+		var entry = currentAvatar();
+		var loggedIn = !!state.address;
+		var loginWrap = $('#loginAvatarWrap');
+		var lockedWrap = $('#lockedAvatarWrap');
+		if (loginWrap) {
+			loginWrap.classList.toggle('hidden', !entry || loggedIn);
+			renderAvatarPreview('#loginAvatarWrap .login-avatar-preview', entry, 'key-round');
+		}
+		if (lockedWrap) {
+			lockedWrap.classList.toggle('hidden', !entry || state.mode !== 'locked');
+			renderAvatarPreview('#lockedAvatarWrap .login-avatar-preview', entry, 'key-round');
+		}
+		var headerButton = $('#headerAvatarButton');
+		if (headerButton) {
+			headerButton.classList.toggle('hidden', !entry || !loggedIn);
+			if (entry) {
+				var headerImage = $('#headerAvatarImage');
+				headerImage.src = entry.imageUrl || entry.image;
+				headerImage.alt = entry.displayName + ' — Avatar by Noverel';
+				headerImage.onerror = function () { headerButton.classList.add('hidden'); };
+			}
+		}
+		renderAvatarPreview('#settingsAvatarPreview', entry, 'user-round');
+		if ($('#settingsAvatarName')) {
+			$('#settingsAvatarName').textContent = entry ? entry.displayName : 'Not set on this browser';
+		}
+		if ($('#settingsChooseAvatar')) {
+			$('#settingsChooseAvatar').textContent = entry ? 'Change Avatar' : 'Choose Avatar';
+		}
+		if ($('#menuChooseAvatar span')) {
+			$('#menuChooseAvatar span').textContent = entry ? 'Change Avatar' : 'Choose Avatar';
+		}
+		if (window.lucide) { window.lucide.createIcons(); }
+	}
+
+	function renderAvatarPicker() {
+		if (!avatarManager) {
+			return;
+		}
+		var query = String($('#avatarSearch').value || '').trim();
+		var entries = query ? avatarManager.search(query) : (state.avatar.browseAll ? avatarManager.getCatalog() : state.avatar.suggestions);
+		var profile = avatarManager.getStoredProfile();
+		var selectedId = profile ? profile.avatarId : '';
+		var grid = $('#avatarGrid');
+		grid.replaceChildren();
+		entries.forEach(function (entry) {
+			var button = document.createElement('button');
+			button.className = 'noverel-avatar-choice';
+			button.type = 'button';
+			button.dataset.avatarId = entry.id;
+			button.setAttribute('aria-pressed', entry.id === selectedId ? 'true' : 'false');
+			button.setAttribute('aria-label', 'Choose ' + entry.displayName);
+			var image = document.createElement('img');
+			image.src = entry.imageUrl || entry.image;
+			image.alt = '';
+			image.loading = 'lazy';
+			var label = document.createElement('span');
+			label.className = 'noverel-avatar-choice-label';
+			label.textContent = entry.displayName;
+			var check = document.createElement('span');
+			check.className = 'noverel-avatar-check';
+			check.setAttribute('aria-hidden', 'true');
+			check.textContent = '✓';
+			button.append(image, label, check);
+			grid.appendChild(button);
+		});
+		$('#avatarEmpty').classList.toggle('hidden', entries.length > 0);
+		$('#avatarPickerScope').textContent = query ? entries.length + ' result' + (entries.length === 1 ? '' : 's') : (state.avatar.browseAll ? 'All ' + entries.length + ' avatars' : 'Six suggestions');
+		$('#browseAllAvatars').textContent = state.avatar.browseAll && !query ? 'Show six suggestions' : 'Browse all 128';
+	}
+
+	function openAvatarPicker(context) {
+		if (!avatarManager) {
+			showToast('Avatar by Noverel is unavailable.', 'danger');
+			return;
+		}
+		closeMenu();
+		$('#avatarPromptModal').classList.remove('active');
+		state.avatar.pickerContext = context || 'menu';
+		state.avatar.browseAll = false;
+		$('#avatarSearch').value = '';
+		$('#avatarPickerError').textContent = '';
+		avatarManager.loadManifest().then(function () {
+			state.avatar.suggestions = avatarManager.suggestions(6);
+			renderAvatarPicker();
+			$('#avatarPickerModal').classList.add('active');
+			window.setTimeout(function () { $('#avatarSearch').focus(); }, 0);
+		}).catch(function (error) {
+			showToast(error.message || 'Avatar catalog could not be loaded.', 'danger');
+		});
+	}
+
+	function closeAvatarPicker() {
+		state.avatar.pickerContext = '';
+		$('#avatarPickerModal').classList.remove('active');
+	}
+
+	function chooseAvatar(entry) {
+		if (!entry || !avatarManager) {
+			return;
+		}
+		try {
+			avatarManager.select(entry.id, 'browser-local');
+			storageSet(STORAGE.avatarPrompted, '1');
+			closeAvatarPicker();
+			renderAvatarSurfaces();
+			showToast(entry.displayName + ' is now your Avatar by Noverel.');
+		} catch (error) {
+			$('#avatarPickerError').textContent = error.message || 'Avatar could not be saved.';
+		}
+	}
+
+	function openAvatarDetail() {
+		var entry = currentAvatar();
+		if (!entry) {
+			openAvatarPicker('header');
+			return;
+		}
+		renderAvatarPreview('#avatarDetailPreview', entry, 'user-round');
+		$('#avatarDetailName').textContent = entry.displayName;
+		$('#avatarDetailModal').classList.add('active');
+	}
+
+	function offerAvatarSetup(force) {
+		if (!state.address || state.mode === 'watch' || state.mode === 'locked' || currentAvatar()) {
+			return;
+		}
+		if (!force && storageGet(STORAGE.avatarPrompted, '') === '1') {
+			return;
+		}
+		window.setTimeout(function () {
+			if (state.address && state.mode !== 'locked' && !currentAvatar() && !$('#pinSetupModal').classList.contains('active')) {
+				$('#avatarPromptModal').classList.add('active');
+			}
+		}, 450);
 	}
 
 	function defaultSettings() {
@@ -1387,6 +1582,7 @@
 		$('#walletScreen').classList.toggle('active', loggedIn);
 		$('#walletScreen').classList.toggle('wallet-locked', state.mode === 'locked');
 		document.body.classList.toggle('wallet-open', loggedIn);
+		renderAvatarSurfaces();
 		if (!loggedIn) {
 			updateAccessUi();
 			return;
@@ -1530,6 +1726,7 @@
 		startBalanceLoop();
 		resetAutoLockTimer();
 		showToast(created ? 'Wallet created. Copy your private key before closing this view.' : 'Wallet opened.');
+		offerAvatarSetup(false);
 	}
 
 	function openWatchOnly(record, message) {
@@ -2929,6 +3126,7 @@
 			closePinSetupFlow();
 			setLoginMode('pin');
 			showToast('PIN enabled. SweetWallet is saved on this device.');
+			offerAvatarSetup(false);
 		}).catch(function (error) {
 			showToast(error.message || 'Quick-unlock PIN could not be enabled.', 'danger');
 		}).finally(function () {
@@ -3150,6 +3348,37 @@
 		$('#menuToggle').addEventListener('click', openMenu);
 		$('#menuClose').addEventListener('click', closeMenu);
 		$('#menuBackdrop').addEventListener('click', closeMenu);
+		$('#menuChooseAvatar').addEventListener('click', function () { openAvatarPicker('menu'); });
+		$('#settingsChooseAvatar').addEventListener('click', function () { openAvatarPicker('settings'); });
+		$('#headerAvatarButton').addEventListener('click', openAvatarDetail);
+		$('#closeAvatarDetail').addEventListener('click', function () { $('#avatarDetailModal').classList.remove('active'); });
+		$('#dismissAvatarDetail').addEventListener('click', function () { $('#avatarDetailModal').classList.remove('active'); });
+		$('#detailChangeAvatar').addEventListener('click', function () {
+			$('#avatarDetailModal').classList.remove('active');
+			openAvatarPicker('detail');
+		});
+		$('#skipAvatarPrompt').addEventListener('click', function () {
+			storageSet(STORAGE.avatarPrompted, '1');
+			$('#avatarPromptModal').classList.remove('active');
+		});
+		$('#startAvatarPrompt').addEventListener('click', function () { openAvatarPicker('onboarding'); });
+		$('#closeAvatarPicker').addEventListener('click', closeAvatarPicker);
+		$('#avatarSearch').addEventListener('input', renderAvatarPicker);
+		$('#browseAllAvatars').addEventListener('click', function () {
+			state.avatar.browseAll = !state.avatar.browseAll;
+			$('#avatarSearch').value = '';
+			renderAvatarPicker();
+		});
+		$('#avatarGrid').addEventListener('click', function (event) {
+			var button = event.target.closest('[data-avatar-id]');
+			if (button && avatarManager) {
+				chooseAvatar(avatarManager.getAvatarById(button.dataset.avatarId));
+			}
+		});
+		$('#randomAvatar').addEventListener('click', function () {
+			try { chooseAvatar(avatarManager.randomAvatar()); }
+			catch (error) { $('#avatarPickerError').textContent = error.message || 'Avatar could not be selected.'; }
+		});
 
 		$('#menuLockButton').addEventListener('click', function () {
 			if ($('#menuLockButton').disabled) {
@@ -3691,6 +3920,9 @@
 			showToast('Encrypted vault library failed to load.', 'danger');
 			return;
 		}
+		if (Avatar && Avatar.createAvatarManager) {
+			avatarManager = Avatar.createAvatarManager({ manifestUrl: Avatar.MANIFEST_URL });
+		}
 		loadSettings();
 		loadStoredRecords();
 		$('#sendFee').value = state.fee;
@@ -3709,6 +3941,14 @@
 		}
 		if (window.lucide) {
 			window.lucide.createIcons();
+		}
+		if (avatarManager) {
+			avatarManager.loadManifest().then(function () {
+				renderAvatarSurfaces();
+			}).catch(function () {
+				// Avatar personalization is optional and must never block wallet access.
+				renderAvatarSurfaces();
+			});
 		}
 	}
 

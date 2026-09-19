@@ -143,6 +143,28 @@ main {
 	gap: 8px;
 }
 
+.noverel-avatar-button {
+	display: grid;
+	place-items: center;
+	width: 48px;
+	height: 48px;
+	min-height: 48px;
+	padding: 3px;
+	border: 2px solid rgba(123, 227, 143, 0.9);
+	border-radius: 50%;
+	background: #03291a;
+	box-shadow: 0 0 0 3px rgba(123, 227, 143, 0.12), 0 10px 24px rgba(0, 18, 11, 0.24);
+}
+
+.noverel-avatar-button img,
+.noverel-avatar-preview img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	border-radius: 50%;
+	object-fit: cover;
+}
+
 .balance-chip {
 	min-width: 92px;
 	min-height: 48px;
@@ -278,6 +300,35 @@ main {
 	gap: 12px;
 	align-items: start;
 	margin-bottom: 30px;
+}
+
+.login-avatar-wrap {
+	display: grid;
+	justify-items: center;
+	gap: 7px;
+	margin: 0 auto 20px;
+	color: rgba(231, 255, 239, 0.72);
+	font-size: 0.68rem;
+	font-weight: 800;
+	letter-spacing: 0.07em;
+	text-transform: uppercase;
+}
+
+.noverel-avatar-preview {
+	display: grid;
+	place-items: center;
+	overflow: hidden;
+	border: 1px solid rgba(149, 232, 176, 0.25);
+	border-radius: 50%;
+	background: #071d13;
+	color: #a6f5c2;
+}
+
+.login-avatar-preview {
+	width: 92px;
+	height: 92px;
+	border: 2px solid #7be38f;
+	box-shadow: 0 0 0 5px rgba(123, 227, 143, 0.08), 0 14px 32px rgba(0, 0, 0, 0.25);
 }
 
 .login-title {
@@ -1533,6 +1584,46 @@ select:focus {
 	text-shadow: 0 0 12px rgba(255, 255, 255, 0.34);
 }
 
+.avatar-setting-row {
+	display: grid;
+	gap: 14px;
+	margin: 14px 0 18px;
+	padding: 14px;
+	border: 1px solid rgba(169, 245, 188, 0.12);
+	border-radius: 18px;
+	background: rgba(0, 39, 25, 0.28);
+}
+
+.avatar-setting-copy {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	min-width: 0;
+}
+
+.avatar-setting-copy > div:last-child {
+	display: grid;
+	gap: 3px;
+	min-width: 0;
+}
+
+.avatar-setting-copy small {
+	display: block;
+	color: rgba(231, 255, 239, 0.65);
+	font-size: 0.74rem;
+	line-height: 1.35;
+}
+
+.avatar-preview-small {
+	width: 54px;
+	height: 54px;
+	flex: 0 0 54px;
+}
+
+.avatar-setting-button {
+	width: 100%;
+}
+
 .menu-pin-sparkle {
 	margin-left: auto;
 	color: #ffe46a;
@@ -1576,6 +1667,197 @@ select:focus {
 	color: rgba(255, 255, 255, 0.94);
 	font-size: 1.2rem;
 	font-weight: 800;
+}
+
+.avatar-prompt-card,
+.avatar-detail-card {
+	text-align: center;
+}
+
+.avatar-prompt-card > p,
+.avatar-detail-card > p,
+.avatar-picker-card > p {
+	color: rgba(235, 255, 242, 0.72);
+	line-height: 1.5;
+}
+
+.avatar-prompt-placeholder {
+	width: 92px;
+	height: 92px;
+	margin: 0 auto 16px;
+	border: 2px solid #7be38f;
+}
+
+.avatar-prompt-placeholder svg,
+.avatar-preview-small svg,
+.avatar-preview-detail svg {
+	width: 42%;
+	height: 42%;
+}
+
+.avatar-modal-header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+	text-align: left;
+}
+
+.avatar-modal-header .login-eyebrow {
+	margin-bottom: 7px;
+}
+
+.avatar-picker-card {
+	width: min(calc(100vw - 24px), 680px);
+	max-height: min(90svh, 760px);
+	overflow-y: auto;
+	text-align: left;
+}
+
+.avatar-noverel-note {
+	margin: 14px 0;
+	padding: 14px 16px;
+	border: 1px solid rgba(149, 232, 176, 0.15);
+	border-radius: 18px;
+	background: rgba(57, 215, 127, 0.06);
+	color: rgba(231, 255, 239, 0.7);
+	font-size: 0.78rem;
+	line-height: 1.5;
+}
+
+.avatar-noverel-note p {
+	margin: 0;
+}
+
+.avatar-noverel-note p + p {
+	margin-top: 8px;
+}
+
+.avatar-noverel-note strong {
+	color: #effff4;
+}
+
+.avatar-noverel-note a {
+	color: #a7e5bb;
+	font-weight: 800;
+}
+
+.avatar-noverel-credit span {
+	color: #f27d87;
+}
+
+.avatar-search {
+	margin-top: 16px;
+}
+
+.avatar-picker-toolbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin: 4px 2px 12px;
+	color: rgba(231, 255, 239, 0.62);
+	font-size: 0.76rem;
+}
+
+.avatar-text-button {
+	min-height: 44px;
+	padding: 6px 4px;
+	border: 0;
+	background: transparent;
+	color: #a7e5bb;
+	font-weight: 800;
+}
+
+.noverel-avatar-grid {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 10px;
+}
+
+.noverel-avatar-choice {
+	position: relative;
+	display: grid;
+	justify-items: center;
+	gap: 7px;
+	min-width: 0;
+	min-height: 44px;
+	padding: 9px 7px 10px;
+	border: 2px solid rgba(149, 232, 176, 0.14);
+	border-radius: 18px;
+	background: #0b2015;
+	color: #effff4;
+}
+
+.noverel-avatar-choice:hover,
+.noverel-avatar-choice:focus-visible {
+	border-color: rgba(123, 227, 143, 0.78);
+	outline: none;
+	box-shadow: 0 0 0 3px rgba(123, 227, 143, 0.1);
+}
+
+.noverel-avatar-choice[aria-pressed="true"] {
+	border-color: #7be38f;
+	background: rgba(20, 67, 42, 0.9);
+}
+
+.noverel-avatar-choice img {
+	display: block;
+	width: min(100%, 112px);
+	aspect-ratio: 1;
+	border-radius: 50%;
+	object-fit: cover;
+}
+
+.noverel-avatar-choice-label {
+	max-width: 100%;
+	font-size: 0.72rem;
+	font-weight: 800;
+	line-height: 1.25;
+	text-align: center;
+	overflow-wrap: anywhere;
+}
+
+.noverel-avatar-check {
+	position: absolute;
+	top: 7px;
+	right: 7px;
+	display: none;
+	place-items: center;
+	width: 24px;
+	height: 24px;
+	border: 2px solid #07150e;
+	border-radius: 50%;
+	background: #7be38f;
+	color: #021008;
+	font-weight: 900;
+}
+
+.noverel-avatar-choice[aria-pressed="true"] .noverel-avatar-check {
+	display: grid;
+}
+
+.avatar-empty,
+.avatar-error {
+	color: rgba(231, 255, 239, 0.68);
+	font-size: 0.82rem;
+}
+
+.avatar-error {
+	color: #ffd3d3;
+}
+
+.avatar-preview-detail {
+	width: 128px;
+	height: 128px;
+	margin: 18px auto 12px;
+	border: 2px solid #7be38f;
+	box-shadow: 0 0 0 5px rgba(123, 227, 143, 0.08);
+}
+
+.avatar-detail-card h3 {
+	margin: 0 0 8px;
+	color: white;
 }
 
 .modal-card .notice {
@@ -2329,6 +2611,15 @@ select {
 
 	.new-wallet-button {
 		padding-inline: 10px;
+	}
+
+	.noverel-avatar-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.login-avatar-preview {
+		width: 82px;
+		height: 82px;
 	}
 }
 
