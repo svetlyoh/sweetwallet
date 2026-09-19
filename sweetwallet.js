@@ -1815,6 +1815,8 @@
 	}
 
 	function lockWallet(message) {
+		// A lock transitions away from the wallet surface, so no menu sheet may remain above the unlock screen.
+		closeMenu();
 		if (!state.address || state.mode === 'watch') {
 			return;
 		}
