@@ -69,17 +69,39 @@
 						<div id="loginAvatarWrap" class="login-avatar-wrap hidden">
 							<div class="noverel-avatar-preview login-avatar-preview"><img id="loginAvatarImage" alt=""></div>
 						</div>
-						<button id="createWallet" class="new-wallet-button" type="button" aria-label="Create new wallet" title="Create new wallet">
-							<i data-lucide="plus"></i>
-						</button>
-						<div class="login-title-row">
-							<div class="login-heading">
-								<h2 class="login-title">WELCOME BACK</h2>
-								<p id="loginCopy" class="login-copy">Open a saved wallet or create a new one.</p>
+						<section id="welcomeAccessView" class="access-view">
+							<div class="login-title-row"><div class="login-heading">
+								<h2 class="login-title">WELCOME TO SWEETWALLET</h2>
+								<p class="login-copy">A private SUGAR wallet that runs in your browser.</p>
+							</div></div>
+							<div class="notice login-helper-note"><i data-lucide="shield-check"></i><span>Your wallet keys stay on this device. SweetWallet does not send your private key to us or the Sugarchain API.</span></div>
+							<div class="access-actions">
+								<button id="createWallet" class="button access-primary" type="button"><i data-lucide="wallet-cards"></i>Create New Wallet</button>
+								<button id="openImportFlow" class="button secondary access-secondary" type="button"><i data-lucide="key-round"></i>I Already Have a Wallet</button>
 							</div>
-						</div>
+							<p class="access-support-copy">You stay in control. You can remove this wallet’s saved encrypted key from this browser later.</p>
+						</section>
 
-						<form id="loginForm" autocomplete="off">
+						<section id="importAccessView" class="access-view hidden" aria-labelledby="importWalletTitle">
+							<button id="backToWelcome" class="back-button" type="button"><i data-lucide="arrow-left"></i>Back</button>
+							<div class="login-title-row"><div class="login-heading">
+								<h2 id="importWalletTitle" class="login-title">I ALREADY HAVE A WALLET</h2>
+								<p class="login-copy">Use your Sugarchain private key to open an existing wallet.</p>
+							</div></div>
+							<div class="notice login-helper-note import-security-copy"><i data-lucide="shield-check"></i><span><strong>Your key stays in this browser.</strong> SweetWallet uses it locally to open and sign your wallet. It is not sent to SweetWallet, Noverel, or Sugarchain APIs. Opening it does not automatically save it.</span></div>
+							<form id="importWalletForm" autocomplete="off">
+								<div class="form-row import-key-row"><label for="importPrivateKey">Private key</label><div class="field-pair"><input id="importPrivateKey" class="monospace" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Paste your Sugarchain private key"><button id="toggleImportPrivateKey" class="copy-button" type="button" aria-label="Show private key"><i data-lucide="eye"></i></button></div></div>
+								<button id="importWalletSubmit" class="button access-primary" type="submit"><i data-lucide="unlock"></i>Open Wallet</button>
+							</form>
+							<p class="access-support-copy">You can later save this wallet encrypted on this browser, or disconnect it and remove the saved copy.</p>
+						</section>
+
+						<section id="unlockAccessView" class="access-view hidden">
+							<div class="login-title-row"><div class="login-heading">
+								<h2 class="login-title">WELCOME BACK</h2>
+								<p id="loginCopy" class="login-copy"></p>
+							</div></div>
+							<form id="loginForm" autocomplete="off">
 							<div id="savedWalletInfo" class="wallet-unlock-summary hidden">
 								<span>Unlock saved wallet</span>
 								<strong id="savedWalletAddress">None</strong>
@@ -97,11 +119,10 @@
 									</div>
 									<input id="pinInput" class="pin-input" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" aria-hidden="true">
 								</div>
-								<div class="login-mode-toggle" role="group" aria-label="Login method">
+								<div class="login-mode-toggle unlock-mode-toggle" role="group" aria-label="Login method">
 									<span class="mode-slider" aria-hidden="true"></span>
 									<button class="mode-pill active" type="button" data-login-mode="pin">PIN</button>
 									<button class="mode-pill" type="button" data-login-mode="password">Password</button>
-									<button class="mode-pill" type="button" data-login-mode="privateKey">Private key</button>
 								</div>
 								<p id="loginModeNotice" class="login-mode-notice hidden" role="status"></p>
 								<div id="loginSecretWrap" class="form-row login-secret-wrap hidden">
@@ -114,16 +135,7 @@
 								Log In
 							</button>
 						</form>
-
-						<div id="createdCard" class="notice warning hidden">
-							<label for="createdKey">Generated private key</label>
-							<div class="field-pair">
-								<input id="createdKey" class="monospace" type="password" readonly autocomplete="off">
-								<button class="copy-button" type="button" data-copy-target="#createdKey" aria-label="Copy generated private key">
-									<i data-lucide="copy"></i>
-								</button>
-							</div>
-						</div>
+						</section>
 					</div>
 				</section>
 
@@ -139,7 +151,6 @@
 								<span>Receive</span>
 							</button>
 						</section>
-						<div id="newWalletNotice" class="notice new-wallet-notice hidden" aria-live="polite"><i data-lucide="shield"></i><span>This new wallet is only available for now. To keep it on this device, save it with a password in the Security menu.</span></div>
 
 						<section class="wallet-card" aria-label="Wallet overview">
 							<div class="wallet-top">
@@ -766,8 +777,14 @@
 
 		<div id="pinSetupModal" class="modal pin-setup-modal" role="dialog" aria-modal="true" aria-label="Set up SweetWallet PIN">
 			<form id="pinSetupForm" class="modal-card pin-setup-card" autocomplete="off">
-				<div class="pin-setup-kicker" id="pinSetupStepLabel">Step 1 of 2</div>
+				<div class="pin-setup-kicker" id="pinSetupStepLabel">Step 1 of 3</div>
 				<h2 id="pinSetupTitle">Set up PIN</h2>
+				<div id="pinSetupBackupStep" class="pin-setup-step hidden">
+					<div class="notice warning"><i data-lucide="shield-alert"></i><span>Your private key is your wallet backup. Anyone with it can spend your SUGAR. Keep it private and safe; SweetWallet cannot recover it for you.</span></div>
+					<div class="form-row"><label for="newWalletBackupKey">Private key</label><div class="field-pair"><input id="newWalletBackupKey" class="monospace" type="password" readonly autocomplete="off"><button id="toggleNewWalletBackup" class="copy-button" type="button" aria-label="Show private key"><i data-lucide="eye"></i></button></div></div>
+					<button id="copyNewWalletBackup" class="button subtle" type="button"><i data-lucide="copy"></i>Copy Private Key</button>
+					<label class="acknowledge-backup"><input id="backupAcknowledged" type="checkbox"> <span>I saved my private key somewhere safe.</span></label>
+				</div>
 				<div id="pinSetupManageStep" class="pin-setup-step hidden">
 					<div class="notice">Choose what you want to do with quick-unlock on this browser.</div>
 					<div class="pin-manage-actions">
@@ -782,7 +799,7 @@
 					</div>
 				</div>
 				<div id="pinSetupPasswordStep" class="pin-setup-step">
-					<div class="notice">First, make a wallet password. This saves your wallet safely on this device.</div>
+					<div class="notice">Protect this wallet on this browser with a wallet password. SweetWallet encrypts your private key before saving it locally.</div>
 					<div class="form-row">
 						<label for="setupWalletPassword">Wallet password</label>
 						<input id="setupWalletPassword" type="password" autocomplete="new-password" placeholder="At least 10 characters">
@@ -846,6 +863,9 @@
 				<div id="pinSetupBlockedStep" class="pin-setup-step hidden">
 					<div id="pinSetupBlockedMessage" class="notice danger">PIN setup is not available right now.</div>
 				</div>
+				<div id="pinSetupCompleteStep" class="pin-setup-step hidden">
+					<div class="notice"><i data-lucide="shield-check"></i><span><strong>Wallet ready.</strong> Your wallet is encrypted on this browser and quick unlock is enabled. Keep your private-key backup somewhere safe.</span></div>
+				</div>
 				<div class="modal-actions">
 					<button id="cancelPinSetup" class="button secondary" type="button">Cancel</button>
 					<button id="continuePinSetup" class="button" type="submit">Continue</button>
@@ -902,7 +922,7 @@
 				<div class="pin-setup-kicker" id="disconnectStepLabel">Secure disconnect</div>
 				<h2>Disconnect Wallet</h2>
 				<div id="disconnectPasswordStep" class="disconnect-step">
-					<div class="notice warning">Disconnecting requires you to save your private key first. Enter your password to view and copy it before disconnecting.</div>
+					<div class="notice warning">Confirm your wallet password before removing SweetWallet’s saved encrypted copy from this browser.</div>
 					<div class="form-row">
 						<label for="disconnectPassword">Type Password</label>
 						<input id="disconnectPassword" type="password" autocomplete="current-password" placeholder="Enter wallet password">
@@ -912,16 +932,8 @@
 				<div id="disconnectWatchStep" class="disconnect-step hidden">
 					<div class="notice">This is a watch-only wallet. Disconnecting closes it on this screen and does not affect the blockchain.</div>
 				</div>
-				<div id="disconnectBackupStep" class="disconnect-step hidden">
-					<div class="notice warning">Copy this private key now. Anyone with this key can spend this wallet.</div>
-					<div class="disconnect-backup-box">
-						<label for="disconnectBackupWif">Private key</label>
-						<textarea id="disconnectBackupWif" class="monospace" readonly spellcheck="false"></textarea>
-						<button id="copyDisconnectBackup" class="button subtle" type="button" data-copy-target="#disconnectBackupWif">
-							<i data-lucide="copy"></i>
-							Quick Copy Key
-						</button>
-					</div>
+				<div id="disconnectConfirmStep" class="disconnect-step hidden">
+					<div class="notice warning">This removes SweetWallet’s saved copy of this wallet from this browser. Make sure you already have your private-key backup before continuing. SweetWallet cannot recover the wallet after the saved key is removed.</div>
 				</div>
 				<div id="disconnectBlockedStep" class="disconnect-step hidden">
 					<div id="disconnectBlockedMessage" class="notice danger">Wallet disconnect is not available right now.</div>

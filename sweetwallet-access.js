@@ -19,17 +19,21 @@
 
 	function initialLoginMode(savedVault) {
 		if (hasQuickPin(savedVault)) { return 'pin'; }
-		return savedVault ? 'password' : 'privateKey';
+		return 'password';
+	}
+
+	function accessExperience(mode, savedVault, requestedView) {
+		if (walletScreenVisible(mode)) { return 'wallet'; }
+		if (requestedView === 'import' && !savedVault) { return 'import'; }
+		if (savedVault && accessRequired(mode)) { return 'unlock'; }
+		return 'welcome';
 	}
 
 	function loginModeAvailability(mode, savedVault) {
-		if (mode === 'privateKey') {
-			return { available: true, message: '' };
-		}
 		if (mode === 'password') {
 			return savedVault ? { available: true, message: '' } : {
 				available: false,
-				message: 'No saved wallet is available on this browser. Use a private key or create a new wallet.'
+				message: 'No saved wallet is available on this browser.'
 			};
 		}
 		if (mode === 'pin') {
@@ -39,7 +43,7 @@
 				message: 'No quick-unlock PIN is saved on this browser. Use Password.'
 			} : {
 				available: false,
-				message: 'No quick-unlock PIN is saved on this browser. Use a private key or create a new wallet.'
+				message: 'No quick-unlock PIN is saved on this browser. Use Password.'
 			};
 		}
 		return { available: false, message: 'Choose a login method.' };
@@ -58,7 +62,7 @@
 		return Object.freeze({
 			availability: availability,
 			pinVisible: mode === 'pin',
-			secretVisible: mode === 'password' || mode === 'privateKey',
+			secretVisible: mode === 'password',
 			submitVisible: mode !== 'pin'
 		});
 	}
@@ -88,6 +92,7 @@
 		accessRequired: accessRequired,
 		walletScreenVisible: walletScreenVisible,
 		initialLoginMode: initialLoginMode,
+		accessExperience: accessExperience,
 		loginModeAvailability: loginModeAvailability,
 		loginPresentation: loginPresentation,
 		loginAvatarVisible: loginAvatarVisible,

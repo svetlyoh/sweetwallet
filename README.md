@@ -57,7 +57,7 @@ The configured feeder wallet address is `sugar1q39n666w687nxm9x98tx5kgw2uvk780gt
 
 ## Safety
 
-SweetWallet does not fake balances and does not send private keys or WIFs to a server. Ordinary SUGAR sends always require explicit confirmation. Keylink can auto-broadcast only its ownership-anchor transaction when the current owner explicitly enables PIN autoapproval for that secret and leaves the wallet online and unlocked. Back up the WIF shown in the Keys panel before closing a newly created wallet.
+SweetWallet does not fake balances and does not send private keys or WIFs to a server. Ordinary SUGAR sends always require explicit confirmation. Keylink can auto-broadcast only its ownership-anchor transaction when the current owner explicitly enables PIN autoapproval for that secret and leaves the wallet online and unlocked. New wallets present a private-key backup step before browser password and PIN setup; explicit exports remain available in Security and Keys.
 
 ## Keylink
 

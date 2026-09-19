@@ -48,7 +48,8 @@
 		publicKeyHex: '',
 		walletId: '',
 		mode: 'closed',
-		loginMode: 'privateKey',
+		loginMode: 'password',
+		accessView: 'welcome',
 		pinSubmitting: false,
 		savedVault: null,
 		publicWallet: null,
@@ -84,11 +85,13 @@
 			pinLength: 4,
 			step: 'password',
 			password: '',
-			action: 'setup'
+			action: 'setup',
+			newWallet: false,
+			backupWif: '',
+			backupRevealed: false
 		},
 		disconnectFlow: {
-			step: 'password',
-			backupWif: ''
+			step: 'password'
 		},
 		starterFundingRequested: {},
 		avatar: {
@@ -1353,7 +1356,7 @@
 	}
 
 	function setLoginMode(mode) {
-		if (['pin', 'password', 'privateKey'].indexOf(mode) < 0) {
+		if (['pin', 'password'].indexOf(mode) < 0) {
 			mode = Access.initialLoginMode(state.savedVault);
 		}
 		state.loginMode = mode;
@@ -1421,14 +1424,23 @@
 	}
 
 	function updateLoginUi() {
-		if (!$('#loginSecret')) {
+		if (!$('#loginScreen')) {
 			return;
 		}
 		var loginScreen = $('#loginScreen');
+		var experience = Access.accessExperience(state.mode, state.savedVault, state.accessView);
 		if (loginScreen) {
 			loginScreen.classList.toggle('saved-wallet-login', !!state.savedVault);
-			loginScreen.dataset.loginMode = state.loginMode;
+			loginScreen.dataset.accessExperience = experience;
 		}
+		$('#welcomeAccessView').classList.toggle('hidden', experience !== 'welcome');
+		$('#importAccessView').classList.toggle('hidden', experience !== 'import');
+		$('#unlockAccessView').classList.toggle('hidden', experience !== 'unlock');
+		if (experience !== 'unlock') {
+			if (window.lucide) { window.lucide.createIcons(); }
+			return;
+		}
+		loginScreen.dataset.loginMode = state.loginMode;
 		var savedVault = state.savedVault;
 		var presentation = Access.loginPresentation(state.loginMode, savedVault);
 		var availability = presentation.availability;
@@ -1440,9 +1452,7 @@
 		var notice = $('#loginModeNotice');
 		var copy = $('#loginCopy');
 		var savedWalletInfo = $('#savedWalletInfo');
-		if (copy) {
-			copy.textContent = savedVault ? '' : 'Open a saved wallet or create a new one.';
-		}
+		if (copy) { copy.textContent = ''; }
 		if (savedWalletInfo) {
 			savedWalletInfo.classList.toggle('hidden', !savedVault);
 		}
@@ -1455,6 +1465,9 @@
 		}
 		$$('[data-login-mode]').forEach(function (button) {
 			button.classList.toggle('active', button.dataset.loginMode === state.loginMode);
+			var buttonAvailability = Access.loginModeAvailability(button.dataset.loginMode, savedVault);
+			button.disabled = !buttonAvailability.available;
+			button.title = buttonAvailability.message || '';
 		});
 		if (notice) {
 			notice.textContent = availability.message;
@@ -1472,13 +1485,6 @@
 			input.autocomplete = 'current-password';
 			input.placeholder = state.savedVault ? 'Enter wallet password' : 'Save a wallet first';
 			submit.innerHTML = '<i data-lucide="lock-keyhole-open"></i> Log In';
-		} else if (state.loginMode === 'privateKey') {
-			textLabel.textContent = 'Private key';
-			input.type = 'password';
-			input.inputMode = 'text';
-			input.autocomplete = 'off';
-			input.placeholder = 'Paste Sugarchain private key';
-			submit.innerHTML = '<i data-lucide="key-round"></i> Log In';
 		} else {
 			updatePinBoxes();
 		}
@@ -1528,18 +1534,12 @@
 		var value = $('#loginSecret').value.trim();
 		var button = $('#loginSubmit');
 		if (!value) {
-			showToast('Enter your ' + (state.loginMode === 'privateKey' ? 'private key.' : 'wallet password.'), 'danger');
+			showToast('Enter your wallet password.', 'danger');
 			return;
 		}
 		setBusy(button, true, 'Unlocking...');
 		var action;
-		if (state.loginMode === 'privateKey') {
-			action = Promise.resolve().then(function () {
-				openWallet(bitcoin.ECPair.fromWIF(value, SUGAR_NETWORK), false, 'session');
-			}).catch(function () {
-				throw new Error('That private key is not valid for Sugarchain.');
-			});
-		} else if (state.loginMode === 'password') {
+		if (state.loginMode === 'password') {
 			action = unlockSavedWithPassword(value);
 		} else {
 			action = unlockSavedWithPin(value);
@@ -1549,6 +1549,49 @@
 		}).catch(function (error) {
 			showToast(error.message || 'Wallet could not be unlocked.', 'danger');
 		}).finally(function () {
+			setBusy(button, false);
+			updateLoginUi();
+		});
+	}
+
+	function showWelcomeAccess() {
+		state.accessView = 'welcome';
+		if ($('#importPrivateKey')) { $('#importPrivateKey').value = ''; }
+		if ($('#toggleImportPrivateKey')) {
+			$('#importPrivateKey').type = 'password';
+			$('#toggleImportPrivateKey').setAttribute('aria-label', 'Show private key');
+		}
+		updateLoginUi();
+	}
+
+	function showImportAccess() {
+		if (state.savedVault) {
+			showToast('Disconnect the saved wallet before opening a different wallet on this browser.', 'danger');
+			return;
+		}
+		state.accessView = 'import';
+		updateLoginUi();
+		window.setTimeout(function () { $('#importPrivateKey').focus(); }, 0);
+	}
+
+	function submitImportWallet() {
+		var input = $('#importPrivateKey');
+		var value = input.value.trim();
+		if (!value) {
+			showToast('Paste your Sugarchain private key.', 'danger');
+			return;
+		}
+		var button = $('#importWalletSubmit');
+		setBusy(button, true, 'Opening...');
+		Promise.resolve().then(function () {
+			var keys = bitcoin.ECPair.fromWIF(value, SUGAR_NETWORK);
+			input.value = '';
+			state.accessView = 'welcome';
+			openWallet(keys, false, 'session');
+		}).catch(function () {
+			showToast('That private key is not valid for Sugarchain.', 'danger');
+		}).finally(function () {
+			input.value = '';
 			setBusy(button, false);
 			updateLoginUi();
 		});
@@ -1719,6 +1762,7 @@
 		state.publicKeyHex = keys.publicKey.toString('hex');
 		state.walletId = walletId || state.walletId || (state.savedVault && state.savedVault.walletId) || '';
 		state.mode = mode || 'session';
+		state.accessView = 'welcome';
 		state.keyPrivateRevealed = false;
 		state.balance = 0;
 		state.pendingTx = null;
@@ -1741,7 +1785,7 @@
 		});
 		startBalanceLoop();
 		resetAutoLockTimer();
-		showToast(created ? 'Wallet created. Save it with a password before closing it.' : 'Wallet opened.');
+		showToast(created ? 'Wallet created.' : 'Wallet opened.');
 		offerAvatarSetup(false);
 	}
 
@@ -1798,13 +1842,11 @@
 		state.publicKeyHex = '';
 		state.walletId = '';
 		state.mode = 'closed';
+		state.accessView = state.savedVault ? 'welcome' : 'welcome';
 		state.loginMode = Access.initialLoginMode(state.savedVault);
 		state.balance = 0;
 		resetActivity();
 		$('#loginSecret').value = '';
-		$('#createdKey').value = '';
-		$('#createdCard').classList.add('hidden');
-		$('#newWalletNotice').classList.add('hidden');
 		$('#sendForm').reset();
 		$('#sendSummary').classList.remove('active');
 		closeMenu();
@@ -2729,6 +2771,8 @@
 				input.value = '';
 			}
 		});
+		if ($('#backupAcknowledged')) { $('#backupAcknowledged').checked = false; }
+		if ($('#newWalletBackupKey')) { $('#newWalletBackupKey').value = ''; }
 	}
 
 	function setPinSetupLength(length) {
@@ -2747,31 +2791,39 @@
 	}
 
 	function setPinSetupStep(step, message) {
-		if (['manage', 'password', 'pin', 'change', 'delete', 'blocked'].indexOf(step) < 0) {
+		if (['backup', 'manage', 'password', 'pin', 'complete', 'change', 'delete', 'blocked'].indexOf(step) < 0) {
 			step = 'password';
 		}
 		state.pinSetup.step = step;
 		var isManage = state.pinSetup.step === 'manage';
+		var isBackup = state.pinSetup.step === 'backup';
 		var isPassword = state.pinSetup.step === 'password';
 		var isPin = state.pinSetup.step === 'pin';
+		var isComplete = state.pinSetup.step === 'complete';
 		var isChange = state.pinSetup.step === 'change';
 		var isDelete = state.pinSetup.step === 'delete';
 		var isBlocked = state.pinSetup.step === 'blocked';
-		var title = isManage ? 'Manage PIN' :
+		var title = isBackup ? 'Save your private key' :
+			isComplete ? 'Wallet ready' :
+			isManage ? 'Manage PIN' :
 			isChange ? 'Change PIN' :
 				isDelete ? 'Delete PIN' : 'Set up PIN';
 		$('#pinSetupTitle').textContent = title;
-		$('#pinSetupStepLabel').textContent = isManage ? 'Quick unlock' :
+		$('#pinSetupStepLabel').textContent = isBackup ? 'Step 1 of 3' :
+			isComplete ? 'Setup complete' :
+			isManage ? 'Quick unlock' :
 			isChange ? 'Change PIN' :
 				isDelete ? 'Delete PIN' :
 					isBlocked ? 'Setup paused' :
-						(isPin ? 'Step 2 of 2' : 'Step 1 of 2');
+						(state.pinSetup.newWallet ? (isPin ? 'Step 3 of 3' : 'Step 2 of 3') : (isPin ? 'Step 2 of 2' : 'Step 1 of 2'));
+		$('#pinSetupBackupStep').classList.toggle('hidden', !isBackup);
 		$('#pinSetupManageStep').classList.toggle('hidden', !isManage);
 		$('#pinSetupPasswordStep').classList.toggle('hidden', !isPassword);
 		$('#pinSetupPinStep').classList.toggle('hidden', !isPin);
 		$('#pinSetupChangeStep').classList.toggle('hidden', !isChange);
 		$('#pinSetupDeleteStep').classList.toggle('hidden', !isDelete);
 		$('#pinSetupBlockedStep').classList.toggle('hidden', !isBlocked);
+		$('#pinSetupCompleteStep').classList.toggle('hidden', !isComplete);
 		$('#setupPinPasswordWrap').classList.toggle('hidden', !isPin || !!state.pinSetup.password);
 		if (isBlocked) {
 			$('#pinSetupBlockedMessage').textContent = message || 'PIN setup is not available right now.';
@@ -2788,10 +2840,17 @@
 		$('#continuePinSetup').classList.toggle('danger', isDelete);
 		$('#continuePinSetup').textContent = isDelete ? 'Delete PIN' :
 			isChange ? 'Change PIN' :
-				isPin ? 'Enable PIN' : 'Save Password';
-		$('#cancelPinSetup').textContent = isManage || isBlocked ? 'Close' :
+			isPin ? 'Enable PIN' :
+				isComplete ? 'Go to Wallet' :
+					isBackup ? 'Continue' : 'Save Password';
+		$('#cancelPinSetup').textContent = isManage || isBlocked || isComplete ? 'Close' :
 			(isChange || isDelete ? 'Back' : 'Cancel');
 		$('#pinSetupForm .modal-actions').classList.toggle('manage-only', isManage || isBlocked);
+		if (isBackup && $('#newWalletBackupKey')) {
+			$('#newWalletBackupKey').value = state.pinSetup.backupWif || '';
+			$('#newWalletBackupKey').type = state.pinSetup.backupRevealed ? 'text' : 'password';
+			$('#toggleNewWalletBackup').setAttribute('aria-label', state.pinSetup.backupRevealed ? 'Hide private key' : 'Show private key');
+		}
 		if (isPin || isChange) {
 			setPinSetupLength(state.pinSetup.pinLength);
 		}
@@ -2801,6 +2860,8 @@
 				return;
 			}
 			var target = $('#setupWalletPassword');
+			if (isBackup) { target = $('#toggleNewWalletBackup'); }
+			else if (isComplete) { target = $('#continuePinSetup'); }
 			if (isManage) {
 				target = $('#changePinOptionButton');
 			} else if (isChange) {
@@ -2816,7 +2877,7 @@
 		}, 0);
 	}
 
-	function openPinSetupFlow() {
+	function openPinSetupFlow(newWallet) {
 		if (!state.keys) {
 			var message = state.mode === 'watch' ?
 				'This device only has a watch-only address. Open this wallet with its private key first, then SweetWallet can save it and set up a PIN.' :
@@ -2838,6 +2899,9 @@
 			return;
 		}
 		state.pinSetup.action = 'setup';
+		state.pinSetup.newWallet = !!newWallet;
+		state.pinSetup.backupWif = newWallet && state.keys ? state.keys.toWIF() : '';
+		state.pinSetup.backupRevealed = false;
 		state.pinSetup.password = '';
 		setPinSetupLength(4);
 		clearPinSetupFields();
@@ -2848,12 +2912,15 @@
 			showToast(cryptoError, 'danger');
 			return;
 		}
-		setPinSetupStep(state.savedVault ? 'pin' : 'password');
+		setPinSetupStep(newWallet ? 'backup' : (state.savedVault ? 'pin' : 'password'));
 	}
 
 	function closePinSetupFlow() {
 		state.pinSetup.password = '';
 		state.pinSetup.action = 'setup';
+		state.pinSetup.newWallet = false;
+		state.pinSetup.backupWif = '';
+		state.pinSetup.backupRevealed = false;
 		clearPinSetupFields();
 		$('#pinSetupModal').classList.remove('active');
 		updatePinSetupCta();
@@ -2870,16 +2937,12 @@
 	}
 
 	function clearDisconnectFields() {
-		[
-			'#disconnectPassword',
-			'#disconnectBackupWif'
-		].forEach(function (selector) {
+		['#disconnectPassword'].forEach(function (selector) {
 			var input = $(selector);
 			if (input) {
 				input.value = '';
 			}
 		});
-		state.disconnectFlow.backupWif = '';
 		setDisconnectFeedback('');
 	}
 
@@ -2896,29 +2959,24 @@
 		state.disconnectFlow.step = step || 'password';
 		var isPassword = state.disconnectFlow.step === 'password';
 		var isWatch = state.disconnectFlow.step === 'watch';
-		var isBackup = state.disconnectFlow.step === 'backup';
+		var isConfirm = state.disconnectFlow.step === 'confirm';
 		var isBlocked = state.disconnectFlow.step === 'blocked';
 		$('#disconnectStepLabel').textContent = isWatch ? 'Watch-only wallet' :
-				isBackup ? 'Save private key' :
+				isConfirm ? 'Confirm removal' :
 					isBlocked ? 'Disconnect paused' : 'Secure disconnect';
 		$('#disconnectPasswordStep').classList.toggle('hidden', !isPassword);
 		$('#disconnectWatchStep').classList.toggle('hidden', !isWatch);
-		$('#disconnectBackupStep').classList.toggle('hidden', !isBackup);
+		$('#disconnectConfirmStep').classList.toggle('hidden', !isConfirm);
 		$('#disconnectBlockedStep').classList.toggle('hidden', !isBlocked);
-		if (isBackup && $('#disconnectBackupWif')) {
-			$('#disconnectBackupWif').value = state.disconnectFlow.backupWif || '';
-		}
 		setDisconnectFeedback('');
 		if (isBlocked) {
 			$('#disconnectBlockedMessage').textContent = message || 'Wallet disconnect is not available right now.';
 		}
 		$('#continueDisconnectWallet').classList.toggle('hidden', isBlocked);
-		$('#continueDisconnectWallet').textContent = isBackup ? 'Disconnect Now' : 'Disconnect';
+		$('#continueDisconnectWallet').textContent = isPassword ? 'Continue' : 'Disconnect Wallet';
 		$('#cancelDisconnectWallet').textContent = isBlocked ? 'Close' : 'Cancel';
 		window.setTimeout(function () {
-			var target = isPassword ? $('#disconnectPassword') :
-				isBackup ? $('#copyDisconnectBackup') :
-						$('#continueDisconnectWallet');
+			var target = isPassword ? $('#disconnectPassword') : $('#continueDisconnectWallet');
 			if (target) {
 				target.focus();
 			}
@@ -2938,8 +2996,7 @@
 			return;
 		}
 		if (state.keys) {
-			state.disconnectFlow.backupWif = state.keys.toWIF();
-			setDisconnectStep('backup');
+			setDisconnectStep('confirm');
 			return;
 		}
 		setDisconnectStep('watch');
@@ -2961,7 +3018,7 @@
 			deleteWalletFromDevice('Wallet disconnected from this device.', 'danger');
 			return;
 		}
-		if (state.disconnectFlow.step === 'backup') {
+		if (state.disconnectFlow.step === 'confirm') {
 			closeDisconnectFlow();
 			deleteWalletFromDevice('Wallet disconnected from this device.', 'danger');
 			return;
@@ -2975,10 +3032,9 @@
 			setDisconnectFeedback('');
 			cancelButton.disabled = true;
 			setBusy(button, true, 'Checking...');
-			Vault.decryptVault(state.savedVault, password).then(function (wif) {
-				state.disconnectFlow.backupWif = wif;
+			Vault.decryptVault(state.savedVault, password).then(function () {
 				$('#disconnectPassword').value = '';
-				setDisconnectStep('backup');
+				setDisconnectStep('confirm');
 			}).catch(function (error) {
 				var message = error && !/unlock|accepted|password/i.test(error.message || '') ?
 					error.message :
@@ -2988,8 +3044,8 @@
 			}).finally(function () {
 				cancelButton.disabled = false;
 				setBusy(button, false);
-				if ($('#disconnectWalletModal').classList.contains('active') && state.disconnectFlow.step === 'backup') {
-					button.textContent = 'Disconnect Now';
+				if ($('#disconnectWalletModal').classList.contains('active') && state.disconnectFlow.step === 'confirm') {
+					button.textContent = 'Disconnect Wallet';
 				}
 			});
 			return;
@@ -3003,6 +3059,18 @@
 			return;
 		}
 		if (state.pinSetup.step === 'manage') {
+			return;
+		}
+		if (state.pinSetup.step === 'backup') {
+			if (!$('#backupAcknowledged').checked) {
+				showToast('Confirm that you saved your private key somewhere safe.', 'danger');
+				return;
+			}
+			setPinSetupStep('password');
+			return;
+		}
+		if (state.pinSetup.step === 'complete') {
+			closePinSetupFlow();
 			return;
 		}
 		if (state.pinSetup.step === 'change') {
@@ -3128,9 +3196,15 @@
 		cancelButton.disabled = true;
 		setBusy(button, true, 'Enabling...');
 		enableQuickUnlockPin(passwordForPin, pin).then(function () {
-			closePinSetupFlow();
 			setLoginMode('pin');
-			showToast('PIN enabled. SweetWallet is saved on this device.');
+			if (state.pinSetup.newWallet) {
+				state.pinSetup.password = '';
+				state.pinSetup.backupWif = '';
+				setPinSetupStep('complete');
+			} else {
+				closePinSetupFlow();
+				showToast('PIN enabled. SweetWallet is saved on this device.');
+			}
 			offerAvatarSetup(false);
 		}).catch(function (error) {
 			showToast(error.message || 'Quick-unlock PIN could not be enabled.', 'danger');
@@ -3138,7 +3212,7 @@
 			cancelButton.disabled = false;
 			setBusy(button, false);
 			if ($('#pinSetupModal').classList.contains('active')) {
-				setPinSetupStep('pin');
+				setPinSetupStep(state.pinSetup.step);
 			}
 		});
 	}
@@ -3301,11 +3375,23 @@
 
 		$('#createWallet').addEventListener('click', function () {
 			var keys = createKeys();
-			var wif = keys.toWIF();
-			$('#createdKey').value = wif;
-			$('#createdCard').classList.remove('hidden');
-			$('#newWalletNotice').classList.remove('hidden');
 			openWallet(keys, true);
+			openPinSetupFlow(true);
+		});
+
+		$('#openImportFlow').addEventListener('click', showImportAccess);
+		$('#backToWelcome').addEventListener('click', showWelcomeAccess);
+		$('#importWalletForm').addEventListener('submit', function (event) {
+			event.preventDefault();
+			submitImportWallet();
+		});
+		$('#toggleImportPrivateKey').addEventListener('click', function () {
+			var input = $('#importPrivateKey');
+			var visible = input.type === 'text';
+			input.type = visible ? 'password' : 'text';
+			this.setAttribute('aria-label', visible ? 'Show private key' : 'Hide private key');
+			this.innerHTML = '<i data-lucide="' + (visible ? 'eye' : 'eye-off') + '"></i>';
+			if (window.lucide) { window.lucide.createIcons(); }
 		});
 
 		$('#loginForm').addEventListener('submit', function (event) {
@@ -3426,6 +3512,13 @@
 		});
 
 		$('#cancelPinSetup').addEventListener('click', cancelPinSetupFlow);
+		$('#toggleNewWalletBackup').addEventListener('click', function () {
+			state.pinSetup.backupRevealed = !state.pinSetup.backupRevealed;
+			setPinSetupStep('backup');
+		});
+		$('#copyNewWalletBackup').addEventListener('click', function () {
+			copyValue(state.pinSetup.backupWif || '');
+		});
 
 		$('#changePinOptionButton').addEventListener('click', function () {
 			state.pinSetup.action = 'change';
