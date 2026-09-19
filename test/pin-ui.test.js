@@ -14,3 +14,16 @@ test('PIN entry matches KeyLink square-cell proportions and typing treatment', (
 	assert.match(css, /\.pin-box\.filled::after\s*\{[\s\S]*?width:\s*9px;[\s\S]*?height:\s*9px;[\s\S]*?box-shadow:\s*0 0 0 5px rgba\(223, 249, 231, 0\.07\);/);
 	assert.match(css, /\.pin-entry:focus-within \.pin-box,[\s\S]*?border-color:\s*#39d77f;/);
 });
+
+test('PIN input is scoped inside the PIN entry so it cannot block the Password toggle', () => {
+	const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+	assert.match(
+		html,
+		/id="pinEntry"[^>]*>[\s\S]*?<input id="pinInput" class="pin-input"[\s\S]*?<\/div>[\s\S]*?<div class="login-mode-toggle unlock-mode-toggle"/
+	);
+	assert.doesNotMatch(
+		html,
+		/<\/div>\s*<input id="pinInput" class="pin-input"[^>]*>\s*<\/div>\s*<div class="login-mode-toggle unlock-mode-toggle"/
+	);
+});
+
