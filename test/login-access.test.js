@@ -78,6 +78,14 @@ test('login mode switches expose the requested usable control and describe unava
 	assert.match(unavailablePassword.availability.message, /No saved wallet/);
 });
 
+test('the invisible PIN input is contained inside the PIN cells and cannot cover Password', () => {
+	const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+	assert.match(html, /id="pinEntry"[^>]*>[\s\S]*?<input id="pinInput" class="pin-input"[\s\S]*?<\/div>\s*<\/div>\s*<div class="login-mode-toggle unlock-mode-toggle"/);
+	assert.doesNotMatch(html, /<\/div>\s*<input id="pinInput" class="pin-input"[\s\S]*?<div class="login-mode-toggle unlock-mode-toggle"/);
+	assert.equal(Access.loginPresentation('password', savedWithPin).secretVisible, true);
+	assert.equal(Access.loginPresentation('password', savedWithPin).submitVisible, true);
+});
+
 test('fresh, import, and returning experiences keep their controls separate', () => {
 	const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 	const client = fs.readFileSync(path.join(__dirname, '..', 'sweetwallet.js'), 'utf8');
