@@ -245,6 +245,33 @@ main {
 	line-height: 1.25;
 }
 
+.about-credit {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
+}
+
+.about-credit svg {
+	width: 13px;
+	height: 13px;
+	color: #f27d87;
+	fill: currentColor;
+}
+
+.about-credit a {
+	color: inherit;
+	font-weight: 800;
+	text-decoration: none;
+}
+
+.about-credit a:hover,
+.about-credit a:focus-visible {
+	color: white;
+	text-decoration: underline;
+	outline: none;
+}
+
 .about-project-button {
 	display: inline-flex;
 	align-items: center;
@@ -455,39 +482,39 @@ main {
 }
 
 .pin-entry {
+	position: relative;
 	display: grid;
 	grid-template-columns: repeat(6, minmax(0, 1fr));
-	gap: 8px;
-	width: min(100%, 298px);
-	margin: 14px auto 8px;
+	gap: 7px;
+	width: min(100%, 360px);
+	margin: 18px auto;
 }
 
 .pin-entry[data-length="4"] {
 	grid-template-columns: repeat(4, minmax(0, 1fr));
-	width: min(100%, 204px);
+	gap: 9px;
+	width: min(100%, 286px);
 }
 
 .pin-input {
 	position: absolute;
-	width: 1px;
-	height: 1px;
-	min-height: 1px;
+	inset: 0;
+	z-index: 2;
+	width: 100%;
+	height: 100%;
+	min-height: 0;
 	opacity: 0;
-	pointer-events: none;
+	cursor: text;
 }
 
 .pin-box {
 	display: grid;
 	place-items: center;
-	aspect-ratio: 0.82;
+	aspect-ratio: 1;
 	min-width: 0;
-	max-height: 66px;
-	border: 1px solid rgba(132, 217, 150, 0.26);
-	border-radius: 8px;
-	background: rgba(1, 63, 39, 0.72);
-	box-shadow:
-		inset 0 0 0 1px rgba(255, 255, 255, 0.04),
-		0 1px 0 rgba(255, 255, 255, 0.06);
+	border: 1px solid rgba(149, 232, 176, 0.2);
+	border-radius: 16px;
+	background: linear-gradient(145deg, rgba(0, 34, 21, 0.76), rgba(1, 73, 43, 0.58));
 }
 
 .pin-box.pin-box-unused {
@@ -500,14 +527,13 @@ main {
 	height: 9px;
 	border-radius: 50%;
 	background: #dff9e7;
+	box-shadow: 0 0 0 5px rgba(223, 249, 231, 0.07);
 }
 
+.pin-entry:focus-within .pin-box,
 .pin-entry:focus-visible .pin-box,
 .pin-entry.active .pin-box {
-	border-color: rgba(123, 227, 143, 0.46);
-	box-shadow:
-		inset 0 0 0 1px rgba(255, 255, 255, 0.06),
-		0 0 0 2px rgba(123, 227, 143, 0.12);
+	border-color: #39d77f;
 }
 
 .login-card .login-field-row label {
@@ -2347,24 +2373,17 @@ main {
 }
 
 .pin-entry {
-	gap: 9px;
-	margin-top: 17px;
+	margin-block: 18px;
 }
 
 .pin-box {
-	max-height: 62px;
-	border-color: rgba(166, 242, 185, 0.2);
 	border-radius: 16px;
-	background: linear-gradient(145deg, rgba(0, 34, 21, 0.76), rgba(1, 73, 43, 0.58));
-	box-shadow:
-		inset 0 1px 0 rgba(255, 255, 255, 0.05),
-		0 7px 18px rgba(0, 24, 15, 0.18);
 }
 
+.pin-entry:focus-within .pin-box,
 .pin-entry:focus-visible .pin-box,
 .pin-entry.active .pin-box {
-	border-color: rgba(142, 242, 168, 0.5);
-	box-shadow: 0 0 0 3px rgba(123, 227, 143, 0.09), 0 10px 24px rgba(0, 21, 13, 0.2);
+	border-color: #39d77f;
 }
 
 .login-mode-toggle,

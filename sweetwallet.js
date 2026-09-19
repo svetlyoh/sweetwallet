@@ -580,6 +580,10 @@
 				}
 				return response.json();
 			}).then(function (data) {
+				var method = String(options && options.method || 'GET').toUpperCase();
+				if (method === 'GET' && data && data.error) {
+					throw new Error(data.error.message || 'Sugarchain API request failed.');
+				}
 				if (base !== getBackend()) {
 					setBackend(base);
 					updateBackendUi();
@@ -592,6 +596,17 @@
 		}
 
 		return tryNext();
+	}
+
+	function requestHistoryPage(address, offset) {
+		var path = '/history/' + encodeURIComponent(address);
+		return requestApi(path + '?offset=' + encodeURIComponent(offset)).then(function (data) {
+			return { data: data, supportsOffset: true };
+		}).catch(function () {
+			return requestApi(path).then(function (data) {
+				return { data: data, supportsOffset: false };
+			});
+		});
 	}
 
 	function formatAmount(satoshis) {
@@ -1190,13 +1205,16 @@
 		state.activity.loading = true;
 		renderActivity();
 		var offset = state.activity.offset;
-		return requestApi('/history/' + encodeURIComponent(state.address) + '?offset=' + encodeURIComponent(offset)).then(function (data) {
+		var historySupportsOffset = true;
+		return requestHistoryPage(state.address, offset).then(function (historyPage) {
+			var data = historyPage.data;
+			historySupportsOffset = historyPage.supportsOffset;
 			if (data.error) {
 				throw new Error(data.error.message || 'Unable to load activity.');
 			}
 			var result = data.result || {};
 			var txids = result.tx || [];
-			state.activity.total = Number(result.txcount || txids.length || state.activity.records.length);
+			state.activity.total = Number(historySupportsOffset ? (result.txcount || txids.length || state.activity.records.length) : txids.length);
 			return Promise.all(txids.map(function (txid) {
 				return requestApi('/transaction/' + encodeURIComponent(txid)).then(function (txData) {
 					if (txData.error) {

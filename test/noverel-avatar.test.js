@@ -70,11 +70,16 @@ test('Sweetwallet surfaces Avatar by Noverel without treating it as authenticati
 	const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 	const client = fs.readFileSync(path.join(root, 'sweetwallet.js'), 'utf8');
 	assert.match(html, /id="loginAvatarWrap"/);
+	assert.match(html, /id="loginAvatarWrap"[\s\S]*?<span>Welcome back<\/span>/);
 	assert.match(html, /id="lockedAvatarWrap"/);
 	assert.match(html, /id="headerAvatarButton"/);
 	assert.match(html, /id="menuChooseAvatar"/);
 	assert.match(html, /id="avatarPickerModal"/);
 	assert.match(html, /not identity verification, tracking, or KYC/);
+	assert.match(html, /<\/main>[\s\S]*?<footer class="about-footer"/);
+	assert.match(html, /Made with[\s\S]*?data-lucide="heart"[\s\S]*?href="https:\/\/noverel\.net\/"[\s\S]*?>Noverel<\/a>/);
 	assert.match(client, /offerAvatarSetup\(false\)/);
+	assert.match(client, /method === 'GET' && data && data\.error/);
+	assert.match(client, /function requestHistoryPage\(address, offset\)/);
 	assert.doesNotMatch(client, /removeItem\(['"]noverel_avatar_v1/);
 });
