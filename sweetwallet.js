@@ -1891,6 +1891,7 @@
 		$('#loginSecret').value = '';
 		$('#createdKey').value = '';
 		$('#createdCard').classList.add('hidden');
+		$('#newWalletNotice').classList.add('hidden');
 		$('#sendForm').reset();
 		$('#sendSummary').classList.remove('active');
 		closeMenu();
@@ -3399,6 +3400,7 @@
 			var wif = keys.toWIF();
 			$('#createdKey').value = wif;
 			$('#createdCard').classList.remove('hidden');
+			$('#newWalletNotice').classList.remove('hidden');
 			openWallet(keys, true);
 		});
 

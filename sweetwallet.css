@@ -2331,7 +2331,7 @@ main {
 
 .login-title {
 	color: white;
-	font-size: clamp(1.7rem, 7vw, 2rem);
+	font-size: 1.6rem;
 	letter-spacing: -0.045em;
 	line-height: 1;
 }
@@ -2641,7 +2641,7 @@ select {
 
 .login-avatar-preview {
 	width: 126px;
-	height: 92px;
+	height: 112px;
 	border-radius: 28px;
 	background: #071d13;
 	box-shadow:
@@ -2732,7 +2732,7 @@ select {
 
 	.login-avatar-preview {
 		width: 118px;
-		height: 88px;
+		height: 104px;
 		border-radius: 26px;
 	}
 
@@ -2741,7 +2741,7 @@ select {
 	}
 
 	.login-title {
-		font-size: 1.45rem;
+		font-size: 1.6rem;
 	}
 
 	.wallet-unlock-summary {
@@ -2813,7 +2813,7 @@ body.pin-focused .login-card {
 
 body.pin-focused .login-avatar-preview {
 	width: 104px;
-	height: 78px;
+	height: 90px;
 	border-radius: 22px;
 }
 
@@ -2880,7 +2880,7 @@ body.keyboard-open .about-footer {
 
 	.login-avatar-preview {
 		width: 110px;
-		height: 82px;
+		height: 98px;
 		border-radius: 24px;
 	}
 }

@@ -117,7 +117,7 @@ test('saved-wallet unlock uses compact identity copy and keyboard-aware PIN layo
 	assert.doesNotMatch(html, /Saved wallet:/);
 	assert.match(html, /class="wallet-unlock-summary[^"]*"[\s\S]*?Unlock saved wallet[\s\S]*?id="savedWalletAddress"/);
 	assert.match(html, /class="wallet-unlock-summary[^"]*"[\s\S]*?Unlock saved wallet[\s\S]*?id="lockedSavedWalletAddress"/);
-	assert.match(css, /\.login-avatar-preview\s*\{[\s\S]*?width: 126px;[\s\S]*?height: 92px;[\s\S]*?border-radius: 28px/);
+	assert.match(css, /\.login-avatar-preview\s*\{[\s\S]*?width: 126px;[\s\S]*?height: 112px;[\s\S]*?border-radius: 28px/);
 	assert.match(css, /\.noverel-avatar-button\s*\{[\s\S]*?width: 60px;[\s\S]*?height: 46px;[\s\S]*?border-radius: 16px/);
 	assert.match(css, /body\.pin-focused[\s\S]*?#lockedPinEntryWrap[\s\S]*?\.pin-entry/);
 	assert.match(client, /window\.visualViewport\.addEventListener\('resize', syncPinViewportState/);
@@ -132,6 +132,15 @@ test('avatar artwork is contained and new-wallet action is an accessible icon co
 	assert.doesNotMatch(html, /id="createWallet"[\s\S]*?<span>New<\/span>/);
 	assert.match(css, /\.login-avatar-preview img\s*\{[\s\S]*?object-fit: contain/);
 	assert.match(css, /\.new-wallet-button\s*\{[\s\S]*?width: 42px;[\s\S]*?height: 42px/);
+});
+
+test('new-wallet reminder is friendly and only revealed after creating a wallet', () => {
+	const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+	const client = fs.readFileSync(path.join(root, 'sweetwallet.js'), 'utf8');
+	assert.match(html, /id="newWalletNotice" class="notice login-helper-note hidden"/);
+	assert.match(html, /This new wallet is only available for now\. To keep it on this device, save it with a password in the Security menu\./);
+	assert.match(client, /\$\('#createWallet'\)[\s\S]*?\$\('#newWalletNotice'\)\.classList\.remove\('hidden'\)/);
+	assert.match(client, /function closeWallet[\s\S]*?\$\('#newWalletNotice'\)\.classList\.add\('hidden'\)/);
 });
 
 test('locked startup refreshes the live balance using the saved public address', () => {
