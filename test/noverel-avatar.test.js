@@ -124,6 +124,16 @@ test('saved-wallet unlock uses compact identity copy and keyboard-aware PIN layo
 	assert.match(client, /scrollIntoView\(\{ block: 'nearest', inline: 'nearest', behavior: 'auto' \}\)/);
 });
 
+test('avatar artwork is contained and new-wallet action is an accessible icon control', () => {
+	const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+	const css = fs.readFileSync(path.join(root, 'sweetwallet.css'), 'utf8');
+	assert.match(html, /id="createWallet"[^>]*aria-label="Create new wallet"[^>]*title="Create new wallet"/);
+	assert.match(html, /id="createWallet"[\s\S]*?data-lucide="plus"/);
+	assert.doesNotMatch(html, /id="createWallet"[\s\S]*?<span>New<\/span>/);
+	assert.match(css, /\.login-avatar-preview img\s*\{[\s\S]*?object-fit: contain/);
+	assert.match(css, /\.new-wallet-button\s*\{[\s\S]*?width: 42px;[\s\S]*?height: 42px/);
+});
+
 test('locked startup refreshes the live balance using the saved public address', () => {
 	const client = fs.readFileSync(path.join(root, 'sweetwallet.js'), 'utf8');
 	assert.match(client, /balanceAddress = state\.address \|\| \(state\.savedVault && state\.savedVault\.address\) \|\| ''/);

@@ -2629,7 +2629,8 @@ select {
 
 .noverel-avatar-button img,
 .login-avatar-preview img {
-	object-fit: cover;
+	background: #071d13;
+	object-fit: contain;
 	object-position: center;
 }
 
@@ -2683,10 +2684,30 @@ select {
 	display: none;
 }
 
-#loginScreen.saved-wallet-login .new-wallet-button {
+.new-wallet-button {
 	position: absolute;
-	top: 18px;
-	right: 18px;
+	top: 16px;
+	right: 16px;
+	width: 42px;
+	height: 42px;
+	min-height: 42px;
+	padding: 0;
+	border: 1px solid rgba(177, 246, 195, 0.22);
+	border-radius: 14px;
+	background: rgba(222, 255, 232, 0.1);
+	box-shadow: none;
+	color: #dff9e7;
+}
+
+.new-wallet-button:hover,
+.new-wallet-button:focus-visible {
+	background: rgba(222, 255, 232, 0.18);
+	color: white;
+}
+
+.new-wallet-button svg {
+	width: 21px;
+	height: 21px;
 }
 
 .locked-title-row {
