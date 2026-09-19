@@ -202,6 +202,8 @@
 	function renderAvatarSurfaces() {
 		var entry = currentAvatar();
 		var loggedIn = !!state.address;
+		var activePanel = $('.panel.active');
+		var isMainScreen = activePanel && activePanel.dataset.panel === 'activity';
 		var loginWrap = $('#loginAvatarWrap');
 		var lockedWrap = $('#lockedAvatarWrap');
 		if (loginWrap) {
@@ -214,7 +216,7 @@
 		}
 		var headerButton = $('#headerAvatarButton');
 		if (headerButton) {
-			headerButton.classList.toggle('hidden', !entry || !loggedIn);
+			headerButton.classList.toggle('hidden', !entry || !loggedIn || isMainScreen);
 			if (entry) {
 				var headerImage = $('#headerAvatarImage');
 				headerImage.src = entry.imageUrl || entry.image;
@@ -622,6 +624,14 @@
 		return value.toLocaleString(undefined, {
 			minimumFractionDigits: full ? CONFIG.decimals : 4,
 			maximumFractionDigits: full ? CONFIG.decimals : 4
+		});
+	}
+
+	function formatHeaderBalance(satoshis) {
+		var value = Number(satoshis || 0) / Math.pow(10, CONFIG.decimals);
+		return value.toLocaleString(undefined, {
+			minimumFractionDigits: 2,
+			maximumFractionDigits: 2
 		});
 	}
 
@@ -1049,7 +1059,7 @@
 
 	function updateBalanceUi(loading) {
 		var display = loading ? 'Loading' : formatBalance(state.balance, state.showFullBalance);
-		var chipDisplay = loading ? 'Loading' : formatBalance(state.balance, false);
+		var chipDisplay = loading ? 'Loading' : formatHeaderBalance(state.balance);
 		$('#balanceMain').textContent = display;
 		$('#balanceChipAmount').textContent = chipDisplay;
 		$('#balanceChipTicker').textContent = CONFIG.ticker;
@@ -2696,6 +2706,7 @@
 		$$('.panel').forEach(function (panel) {
 			panel.classList.toggle('active', panel.dataset.panel === name);
 		});
+		renderAvatarSurfaces();
 		closeMenu();
 		if (name === 'activity' && !state.activity.loaded) {
 			loadActivity(true);

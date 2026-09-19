@@ -99,3 +99,13 @@ test('automatic balance loading does not expose raw backend errors after login',
 	assert.match(client, /if \(showSuccess\) \{[\s\S]*?Balance is temporarily unavailable\./);
 	assert.doesNotMatch(client, /showToast\(error\.message \|\| 'Balance refresh failed\.'/);
 });
+
+test('top bar uses two balance decimals and hides its avatar on the main screen', () => {
+	const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+	const client = fs.readFileSync(path.join(root, 'sweetwallet.js'), 'utf8');
+	assert.match(html, /id="refreshBalance"[\s\S]*?id="headerAvatarButton"[\s\S]*?id="menuToggle"/);
+	assert.match(client, /function formatHeaderBalance\(satoshis\)[\s\S]*?minimumFractionDigits: 2,[\s\S]*?maximumFractionDigits: 2/);
+	assert.match(client, /isMainScreen = activePanel && activePanel\.dataset\.panel === 'activity'/);
+	assert.match(client, /!entry \|\| !loggedIn \|\| isMainScreen/);
+	assert.match(client, /panel\.classList\.toggle\('active', panel\.dataset\.panel === name\);[\s\S]*?renderAvatarSurfaces\(\)/);
+});
