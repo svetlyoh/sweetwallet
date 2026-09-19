@@ -1192,7 +1192,7 @@
 		}
 	}
 
-	function loadActivity(reset) {
+	function loadActivity(reset, showErrors) {
 		if (!state.address || state.activity.loading) {
 			return Promise.resolve();
 		}
@@ -1236,8 +1236,10 @@
 			});
 			state.activity.offset = state.activity.records.length;
 			state.activity.loaded = true;
-		}).catch(function (error) {
-			showToast(error.message || 'Activity load failed.', 'danger');
+		}).catch(function () {
+			if (showErrors) {
+				showToast('Activity is temporarily unavailable.', 'danger');
+			}
 			state.activity.loaded = true;
 		}).finally(function () {
 			state.activity.loading = false;
@@ -1629,9 +1631,11 @@
 				showToast('Balance refreshed from the live chain.');
 			}
 			return state.balance;
-		}).catch(function (error) {
+		}).catch(function () {
 			updateBalanceUi(false);
-			showToast(error.message || 'Balance refresh failed.', 'danger');
+			if (showSuccess) {
+				showToast('Balance is temporarily unavailable.', 'danger');
+			}
 			return state.balance;
 		});
 	}
@@ -3440,11 +3444,11 @@
 		});
 
 		$('#refreshActivity').addEventListener('click', function () {
-			loadActivity(true);
+			loadActivity(true, true);
 		});
 
 		$('#loadMoreActivity').addEventListener('click', function () {
-			loadActivity(false);
+			loadActivity(false, true);
 		});
 
 		$('#copyReceive').addEventListener('click', function () {

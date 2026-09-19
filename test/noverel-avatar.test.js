@@ -72,6 +72,7 @@ test('Sweetwallet surfaces Avatar by Noverel without treating it as authenticati
 	assert.match(html, /id="loginAvatarWrap"/);
 	assert.match(html, /id="loginAvatarWrap"[\s\S]*?<span>Welcome back<\/span>/);
 	assert.match(html, /id="lockedAvatarWrap"/);
+	assert.match(html, /id="lockedAvatarWrap"[\s\S]*?<span>WELCOME BACK<\/span>/);
 	assert.match(html, /id="headerAvatarButton"/);
 	assert.match(html, /id="menuChooseAvatar"/);
 	assert.match(html, /id="avatarPickerModal"/);
@@ -82,4 +83,19 @@ test('Sweetwallet surfaces Avatar by Noverel without treating it as authenticati
 	assert.match(client, /method === 'GET' && data && data\.error/);
 	assert.match(client, /function requestHistoryPage\(address, offset\)/);
 	assert.doesNotMatch(client, /removeItem\(['"]noverel_avatar_v1/);
+});
+
+test('automatic activity loading does not expose raw backend errors after login', () => {
+	const client = fs.readFileSync(path.join(root, 'sweetwallet.js'), 'utf8');
+	assert.match(client, /function loadActivity\(reset, showErrors\)/);
+	assert.match(client, /if \(showErrors\) \{[\s\S]*?Activity is temporarily unavailable\./);
+	assert.doesNotMatch(client, /showToast\(error\.message \|\| 'Activity load failed\.'/);
+	assert.match(client, /#refreshActivity'[\s\S]*?loadActivity\(true, true\)/);
+});
+
+test('automatic balance loading does not expose raw backend errors after login', () => {
+	const client = fs.readFileSync(path.join(root, 'sweetwallet.js'), 'utf8');
+	assert.match(client, /function refreshBalance\(showSuccess\)/);
+	assert.match(client, /if \(showSuccess\) \{[\s\S]*?Balance is temporarily unavailable\./);
+	assert.doesNotMatch(client, /showToast\(error\.message \|\| 'Balance refresh failed\.'/);
 });
