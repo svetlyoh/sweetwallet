@@ -120,6 +120,19 @@ test('header keeps the browser avatar inside its rounded frame and compacts mobi
 	assert.match(css, /\.header-actions\s*\{[\s\S]*?flex: 0 0 auto;/);
 });
 
+test('disconnect backups are masked, temporary, and avatar editing is guarded by unlock state', () => {
+	const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+	const client = fs.readFileSync(path.join(root, 'sweetwallet.js'), 'utf8');
+	const css = fs.readFileSync(path.join(root, 'sweetwallet.css'), 'utf8');
+	assert.match(html, /id="disconnectConfirmStep"[\s\S]*?id="disconnectBackupKey"[^>]*type="password"[^>]*readonly[\s\S]*?id="copyDisconnectBackupKey"[^>]*aria-label="Copy private key"/);
+	assert.match(client, /Vault\.decryptVault\(state\.savedVault, password\)\.then\(function \(wif\) \{[\s\S]*?state\.disconnectFlow\.backupWif = wif/);
+	assert.match(client, /function clearDisconnectFields\(\)[\s\S]*?state\.disconnectFlow\.backupWif = ''/);
+	assert.match(client, /function copyDisconnectBackupWif\(\)[\s\S]*?Private key copied\./);
+	assert.match(client, /function canEditAvatar\(\)[\s\S]*?Access\.avatarEditingAllowed/);
+	assert.match(client, /function openAvatarPicker\(context\) \{[\s\S]*?!canEditAvatar\(\)/);
+	assert.match(css, /#welcomeAccessView \.login-heading\s*\{[\s\S]*?text-align: center/);
+});
+
 test('saved-wallet unlock uses compact identity copy and keyboard-aware PIN layout', () => {
 	const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 	const css = fs.readFileSync(path.join(root, 'sweetwallet.css'), 'utf8');

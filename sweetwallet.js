@@ -94,7 +94,8 @@
 			backupRevealed: false
 		},
 		disconnectFlow: {
-			step: 'password'
+			step: 'password',
+			backupWif: ''
 		},
 		starterFundingRequested: {},
 		avatar: {
@@ -180,6 +181,10 @@
 		};
 	}
 
+	function canEditAvatar() {
+		return Access.avatarEditingAllowed(state.mode, !!state.keys);
+	}
+
 	function renderAvatarPreview(selector, entry, fallbackIcon) {
 		var preview = $(selector);
 		if (!preview) {
@@ -229,9 +234,22 @@
 		}
 		if ($('#settingsChooseAvatar')) {
 			$('#settingsChooseAvatar').textContent = entry ? 'Change Avatar' : 'Choose Avatar';
+			$('#settingsChooseAvatar').disabled = !canEditAvatar();
+			$('#settingsChooseAvatar').title = canEditAvatar() ? '' : 'Unlock your wallet to change your avatar.';
 		}
 		if ($('#menuChooseAvatar span')) {
 			$('#menuChooseAvatar span').textContent = entry ? 'Change Avatar' : 'Choose Avatar';
+		}
+		if ($('#menuChooseAvatar')) {
+			$('#menuChooseAvatar').disabled = !canEditAvatar();
+			$('#menuChooseAvatar').title = canEditAvatar() ? '' : 'Unlock your wallet to change your avatar.';
+		}
+		if ($('#detailChangeAvatar')) {
+			$('#detailChangeAvatar').disabled = !canEditAvatar();
+			if (!canEditAvatar()) {
+				$('#avatarDetailModal').classList.remove('active');
+				$('#avatarPickerModal').classList.remove('active');
+			}
 		}
 		if (window.lucide) { window.lucide.createIcons(); }
 	}
@@ -273,6 +291,10 @@
 	}
 
 	function openAvatarPicker(context) {
+		if (!canEditAvatar()) {
+			showToast('Unlock your wallet to change your avatar.', 'danger');
+			return;
+		}
 		if (!avatarManager) {
 			showToast('Avatar by Noverel is unavailable.', 'danger');
 			return;
@@ -299,7 +321,7 @@
 	}
 
 	function chooseAvatar(entry) {
-		if (!entry || !avatarManager) {
+		if (!canEditAvatar() || !entry || !avatarManager) {
 			return;
 		}
 		try {
@@ -314,6 +336,9 @@
 	}
 
 	function openAvatarDetail() {
+		if (!canEditAvatar()) {
+			return;
+		}
 		var entry = currentAvatar();
 		if (!entry) {
 			openAvatarPicker('header');
@@ -1382,9 +1407,15 @@
 		if (['pin', 'password'].indexOf(mode) < 0) {
 			mode = Access.initialLoginMode(state.savedVault);
 		}
+		if (mode === 'password' && document.activeElement === $('#pinInput')) {
+			$('#pinInput').blur();
+		}
 		state.loginMode = mode;
 		if ($('#loginSecret')) {
 			$('#loginSecret').value = '';
+		}
+		if (mode === 'password') {
+			document.body.classList.remove('pin-focused', 'keyboard-open');
 		}
 		updateLoginUi();
 	}
@@ -2962,13 +2993,46 @@
 	}
 
 	function clearDisconnectFields() {
-		['#disconnectPassword'].forEach(function (selector) {
+		['#disconnectPassword', '#disconnectBackupKey'].forEach(function (selector) {
 			var input = $(selector);
 			if (input) {
 				input.value = '';
 			}
 		});
+		state.disconnectFlow.backupWif = '';
 		setDisconnectFeedback('');
+	}
+
+	function copyDisconnectBackupWif() {
+		var wif = state.disconnectFlow.backupWif || '';
+		if (!wif) {
+			showToast('Private key is unavailable. Reconfirm your wallet password.', 'danger');
+			return;
+		}
+		function clearClipboardLater() {
+			window.setTimeout(function () {
+				if (navigator.clipboard && navigator.clipboard.writeText) {
+					navigator.clipboard.writeText('').catch(function () {});
+				}
+			}, 60000);
+		}
+		if (navigator.clipboard && navigator.clipboard.writeText) {
+			navigator.clipboard.writeText(wif).then(function () {
+				showToast('Private key copied.');
+				clearClipboardLater();
+			}).catch(function () {
+				showToast('Select the private key and copy it manually.', 'warning');
+			});
+			return;
+		}
+		var textarea = document.createElement('textarea');
+		textarea.value = wif;
+		document.body.appendChild(textarea);
+		textarea.select();
+		document.execCommand('copy');
+		textarea.remove();
+		showToast('Private key copied.');
+		clearClipboardLater();
 	}
 
 	function setDisconnectFeedback(message) {
@@ -2995,9 +3059,15 @@
 		$('#disconnectBlockedStep').classList.toggle('hidden', !isBlocked);
 		setDisconnectFeedback('');
 		if (isBlocked) {
+			state.disconnectFlow.backupWif = '';
+			if ($('#disconnectBackupKey')) { $('#disconnectBackupKey').value = ''; }
 			$('#disconnectBlockedMessage').textContent = message || 'Wallet disconnect is not available right now.';
 		}
+		if (isConfirm && $('#disconnectBackupKey')) {
+			$('#disconnectBackupKey').value = state.disconnectFlow.backupWif || '';
+		}
 		$('#continueDisconnectWallet').classList.toggle('hidden', isBlocked);
+		$('#continueDisconnectWallet').classList.toggle('danger', isConfirm);
 		$('#continueDisconnectWallet').textContent = isPassword ? 'Continue' : 'Disconnect Wallet';
 		$('#cancelDisconnectWallet').textContent = isBlocked ? 'Close' : 'Cancel';
 		window.setTimeout(function () {
@@ -3021,6 +3091,7 @@
 			return;
 		}
 		if (state.keys) {
+			state.disconnectFlow.backupWif = state.keys.toWIF();
 			setDisconnectStep('confirm');
 			return;
 		}
@@ -3057,7 +3128,8 @@
 			setDisconnectFeedback('');
 			cancelButton.disabled = true;
 			setBusy(button, true, 'Checking...');
-			Vault.decryptVault(state.savedVault, password).then(function () {
+			Vault.decryptVault(state.savedVault, password).then(function (wif) {
+				state.disconnectFlow.backupWif = wif;
 				$('#disconnectPassword').value = '';
 				setDisconnectStep('confirm');
 			}).catch(function (error) {
@@ -3564,6 +3636,7 @@
 		});
 
 		$('#cancelDisconnectWallet').addEventListener('click', closeDisconnectFlow);
+		$('#copyDisconnectBackupKey').addEventListener('click', copyDisconnectBackupWif);
 
 		$$('[data-pin-length]').forEach(function (button) {
 			button.addEventListener('click', function () {

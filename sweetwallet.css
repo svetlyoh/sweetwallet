@@ -22,6 +22,7 @@ html,
 body {
 	min-height: 100%;
 	margin: 0;
+	background: var(--sw-bg);
 }
 
 body {
@@ -336,6 +337,14 @@ main {
 
 .access-view .login-title-row {
 	margin-bottom: 0;
+}
+
+#welcomeAccessView .login-heading {
+	text-align: center;
+}
+
+#welcomeAccessView .login-copy {
+	margin-inline: auto;
 }
 
 .access-actions {
@@ -2145,6 +2154,14 @@ select:focus {
 .disconnect-step {
 	display: grid;
 	gap: 10px;
+}
+
+.disconnect-backup-row {
+	margin: 2px 0 0;
+}
+
+.disconnect-backup-row input {
+	min-width: 0;
 }
 
 .disconnect-wallet-card label {

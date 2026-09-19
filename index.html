@@ -934,6 +934,13 @@
 				</div>
 				<div id="disconnectConfirmStep" class="disconnect-step hidden">
 					<div class="notice warning">This removes SweetWallet’s saved copy of this wallet from this browser. Make sure you already have your private-key backup before continuing. SweetWallet cannot recover the wallet after the saved key is removed.</div>
+					<div class="form-row disconnect-backup-row">
+						<label for="disconnectBackupKey">Private key</label>
+						<div class="field-pair">
+							<input id="disconnectBackupKey" class="monospace" type="password" readonly autocomplete="off" spellcheck="false">
+							<button id="copyDisconnectBackupKey" class="copy-button" type="button" aria-label="Copy private key"><i data-lucide="copy"></i></button>
+						</div>
+					</div>
 				</div>
 				<div id="disconnectBlockedStep" class="disconnect-step hidden">
 					<div id="disconnectBlockedMessage" class="notice danger">Wallet disconnect is not available right now.</div>

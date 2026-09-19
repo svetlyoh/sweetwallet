@@ -90,15 +90,15 @@ test('fresh, import, and returning experiences keep their controls separate', ()
 	assert.match(client, /input\.value = '';[\s\S]*?openWallet\(keys, false, 'session'\)/);
 });
 
-test('new wallet backups are deliberate and disconnect never displays a private key', () => {
+test('new wallet backups are deliberate and disconnect only offers a masked authorized copy control', () => {
 	const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 	const client = fs.readFileSync(path.join(__dirname, '..', 'sweetwallet.js'), 'utf8');
 	assert.match(html, /id="pinSetupBackupStep"[\s\S]*?id="newWalletBackupKey"[^>]*type="password"[\s\S]*?id="backupAcknowledged"/);
 	assert.match(client, /openPinSetupFlow\(true\)/);
 	assert.match(client, /state\.pinSetup\.step === 'backup'[\s\S]*?backupAcknowledged/);
 	assert.match(html, /id="disconnectConfirmStep"[\s\S]*?Make sure you already have your private-key backup/);
-	assert.doesNotMatch(html, /disconnectBackupWif|copyDisconnectBackup|Disconnecting requires you to save your private key first/);
-	assert.doesNotMatch(client, /disconnectFlow\.backupWif|setDisconnectStep\('backup'\)/);
+	assert.doesNotMatch(html, /disconnectBackupWif|Disconnecting requires you to save your private key first/);
+	assert.doesNotMatch(client, /setDisconnectStep\('backup'\)/);
 });
 
 test('lock and unlock transition between the same canonical access screen and wallet dashboard', () => {
@@ -117,6 +117,14 @@ test('watch-only wallets keep the dashboard but never present an authentication 
 	assertView('watch', false, true);
 	assert.equal(Access.loginAvatarVisible('watch', true), false);
 	assert.equal(Access.headerAvatarVisible('watch', false, true), false);
+});
+
+test('avatar editing is authorized only for an unlocked wallet with its private key', () => {
+	assert.equal(Access.avatarEditingAllowed('closed', false), false);
+	assert.equal(Access.avatarEditingAllowed('locked', false), false);
+	assert.equal(Access.avatarEditingAllowed('watch', false), false);
+	assert.equal(Access.avatarEditingAllowed('saved', true), true);
+	assert.equal(Access.avatarEditingAllowed('session', true), true);
 });
 
 test('the document has one canonical wallet authentication form and no locked login surface', () => {

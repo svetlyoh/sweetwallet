@@ -75,6 +75,10 @@
 		return !!avatarExists && !!hasKeys && (mode === 'saved' || mode === 'session');
 	}
 
+	function avatarEditingAllowed(mode, hasKeys) {
+		return !!hasKeys && (mode === 'saved' || mode === 'session');
+	}
+
 	function applyScreenVisibility(documentObject, mode) {
 		var loginVisible = accessRequired(mode);
 		var walletVisible = walletScreenVisible(mode);
@@ -97,6 +101,7 @@
 		loginPresentation: loginPresentation,
 		loginAvatarVisible: loginAvatarVisible,
 		headerAvatarVisible: headerAvatarVisible,
+		avatarEditingAllowed: avatarEditingAllowed,
 		applyScreenVisibility: applyScreenVisibility
 	});
 }));
