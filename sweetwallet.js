@@ -31,6 +31,7 @@
 	var Vault = window.SweetWalletVault;
 	var Avatar = window.NoverelAvatar;
 	var Access = window.SweetWalletAccess;
+	var Activity = window.SweetWalletActivity;
 	var avatarManager = null;
 	var screenVisibilityObserver = null;
 	var STORAGE = {
@@ -68,9 +69,11 @@
 		activity: {
 			loaded: false,
 			loading: false,
+			status: 'idle',
 			offset: 0,
 			total: 0,
-			records: []
+			records: [],
+			failedTxids: []
 		},
 		qrScanner: {
 			active: false,
@@ -715,9 +718,11 @@
 		state.activity = {
 			loaded: false,
 			loading: false,
+			status: 'idle',
 			offset: 0,
 			total: 0,
-			records: []
+			records: [],
+			failedTxids: []
 		};
 		renderActivity();
 	}
@@ -1123,8 +1128,9 @@
 	}
 
 	function normalizeTransaction(tx) {
-		var inputs = tx.vin || [];
-		var outputs = tx.vout || [];
+		tx = tx || {};
+		var inputs = Array.isArray(tx.vin) ? tx.vin : [];
+		var outputs = Array.isArray(tx.vout) ? tx.vout : [];
 		var inputTotal = inputs.reduce(function (sum, input) {
 			return sum + Number(input.value || 0);
 		}, 0);
@@ -1151,6 +1157,9 @@
 			}));
 		}, []));
 		var received = net >= 0;
+		if (!txid) {
+			throw new Error('Transaction response was incomplete.');
+		}
 		return {
 			txid: txid,
 			net: net,
@@ -1179,14 +1188,20 @@
 		}
 
 		if (!state.activity.records.length) {
-			list.innerHTML = '<div class="activity-empty">' + (state.activity.loaded ? 'No transactions found for this address.' : 'Open Activity to load address transactions.') + '</div>';
-			summary.textContent = state.activity.loaded ? '0 transactions' : 'No transactions loaded';
+			if (state.activity.status === 'error') {
+				list.innerHTML = '<div class="activity-empty">Activity couldn\'t be loaded. Use refresh to try again.</div>';
+				summary.textContent = 'Activity unavailable';
+			} else {
+				list.innerHTML = '<div class="activity-empty">' + (state.activity.status === 'loaded' ? 'No transactions found for this address.' : 'Open Activity to load address transactions.') + '</div>';
+				summary.textContent = state.activity.status === 'loaded' ? '0 transactions' : 'No transactions loaded';
+			}
 			loadMore.classList.add('hidden');
 			return;
 		}
 
-		summary.textContent = state.activity.records.length + ' of ' + state.activity.total + ' transactions';
-		list.innerHTML = state.activity.records.map(function (record, index) {
+		var partialNote = state.activity.status === 'partial' ? '<div class="activity-empty activity-partial">Some activity could not be loaded. Refresh to try again.</div>' : '';
+		summary.textContent = state.activity.records.length + ' of ' + state.activity.total + ' transactions' + (state.activity.status === 'partial' ? ' (some unavailable)' : '');
+		list.innerHTML = partialNote + state.activity.records.map(function (record, index) {
 			var received = record.net >= 0;
 			var pending = record.confirmations <= 0;
 			var rowClass = pending ? 'pending' : (received ? 'received' : 'sent');
@@ -1224,7 +1239,7 @@
 				'</div>' +
 			'</div>';
 		}).join('');
-		loadMore.classList.toggle('hidden', state.activity.records.length >= state.activity.total);
+		loadMore.classList.toggle('hidden', state.activity.offset >= state.activity.total);
 		if (window.lucide) {
 			window.lucide.createIcons();
 		}
@@ -1236,11 +1251,14 @@
 		}
 		if (reset) {
 			state.activity.loaded = false;
+			state.activity.status = 'idle';
 			state.activity.offset = 0;
 			state.activity.total = 0;
 			state.activity.records = [];
+			state.activity.failedTxids = [];
 		}
 		state.activity.loading = true;
+		state.activity.status = 'loading';
 		renderActivity();
 		var offset = state.activity.offset;
 		var historySupportsOffset = true;
@@ -1251,34 +1269,39 @@
 				throw new Error(data.error.message || 'Unable to load activity.');
 			}
 			var result = data.result || {};
-			var txids = result.tx || [];
-			state.activity.total = Number(historySupportsOffset ? (result.txcount || txids.length || state.activity.records.length) : txids.length);
-			return Promise.all(txids.map(function (txid) {
+			var allTxids = Array.isArray(result.tx) ? result.tx : [];
+			var txids = historySupportsOffset ? allTxids : allTxids.slice(offset);
+			var declaredTotal = Number(result.txcount);
+			state.activity.total = Math.max(offset + txids.length, Number.isFinite(declaredTotal) ? declaredTotal : allTxids.length, state.activity.total);
+			return Activity.loadTransactionDetails(txids, function (txid) {
 				return requestApi('/transaction/' + encodeURIComponent(txid)).then(function (txData) {
-					if (txData.error) {
-						throw new Error(txData.error.message || 'Unable to load transaction.');
-					}
-					return normalizeTransaction(txData.result || {});
+					if (txData.error) { throw new Error(txData.error.message || 'Unable to load transaction.'); }
+					var transaction = txData.result || {};
+					if (!transaction.txid && !transaction.hash) { transaction.txid = txid; }
+					return transaction;
 				});
-			}));
-		}).then(function (records) {
+			}, normalizeTransaction, 4);
+		}).then(function (detailResult) {
 			var known = {};
 			state.activity.records.forEach(function (record) {
 				known[record.txid] = true;
 			});
-			records.forEach(function (record) {
+			detailResult.records.forEach(function (record) {
 				if (record.txid && !known[record.txid]) {
 					state.activity.records.push(record);
 					known[record.txid] = true;
 				}
 			});
-			state.activity.offset = state.activity.records.length;
+			state.activity.offset = offset + detailResult.consumed;
 			state.activity.loaded = true;
+			state.activity.failedTxids = detailResult.failedTxids;
+			state.activity.status = Activity.activityStatus(true, state.activity.records.length, detailResult.failedTxids.length);
 		}).catch(function () {
+			state.activity.status = Activity.activityStatus(false, state.activity.records.length, 0);
+			state.activity.loaded = false;
 			if (showErrors) {
 				showToast('Activity is temporarily unavailable.', 'danger');
 			}
-			state.activity.loaded = true;
 		}).finally(function () {
 			state.activity.loading = false;
 			renderActivity();
@@ -3985,6 +4008,10 @@
 		}
 		if (!Access) {
 			showToast('Wallet access controls failed to load.', 'danger');
+			return;
+		}
+		if (!Activity) {
+			showToast('Wallet activity controls failed to load.', 'danger');
 			return;
 		}
 		if (Avatar && Avatar.createAvatarManager) {

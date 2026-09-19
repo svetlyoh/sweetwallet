@@ -109,6 +109,17 @@ test('top bar removes two of eight balance decimals and shows its avatar only wh
 	assert.match(client, /panel\.classList\.toggle\('active', panel\.dataset\.panel === name\);[\s\S]*?renderAvatarSurfaces\(\)/);
 });
 
+test('header keeps the browser avatar inside its rounded frame and compacts mobile branding', () => {
+	const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+	const css = fs.readFileSync(path.join(root, 'sweetwallet.css'), 'utf8');
+	assert.match(html, /class="brand-subtitle">Sugarchain wallet<\/p>/);
+	assert.doesNotMatch(html, /Sugarchain mobile wallet/);
+	assert.match(css, /\.noverel-avatar-button\s*\{[\s\S]*?display: inline-flex;[\s\S]*?overflow: hidden;[\s\S]*?box-sizing: border-box;/);
+	assert.match(css, /\.noverel-avatar-button img,[\s\S]*?max-width: 100%;[\s\S]*?max-height: 100%;[\s\S]*?object-fit: contain;/);
+	assert.match(css, /@media \(max-width: 520px\) \{[\s\S]*?\.brand-subtitle\s*\{[\s\S]*?font-size: 0\.68rem;/);
+	assert.match(css, /\.header-actions\s*\{[\s\S]*?flex: 0 0 auto;/);
+});
+
 test('saved-wallet unlock uses compact identity copy and keyboard-aware PIN layout', () => {
 	const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 	const css = fs.readFileSync(path.join(root, 'sweetwallet.css'), 'utf8');
