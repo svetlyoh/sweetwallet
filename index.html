@@ -65,15 +65,14 @@
 
 			<main>
 				<section id="loginScreen" class="screen active">
-					<div class="login-card">
+					<div id="loginCard" class="login-card">
 						<div id="loginAvatarWrap" class="login-avatar-wrap hidden">
 							<div class="noverel-avatar-preview login-avatar-preview"><img id="loginAvatarImage" alt=""></div>
-							<span>Welcome back</span>
 						</div>
 						<div class="login-title-row">
 							<div class="login-heading">
 								<div class="login-eyebrow"><i data-lucide="shield-check"></i><span>Local &amp; encrypted</span></div>
-								<h2 class="login-title">Welcome back</h2>
+								<h2 class="login-title">WELCOME BACK</h2>
 								<p class="login-copy">Unlock a saved wallet, or use a private key for this session.</p>
 							</div>
 							<button id="createWallet" class="new-wallet-button" type="button" aria-label="Create new wallet">
@@ -83,12 +82,13 @@
 						</div>
 
 						<form id="loginForm" autocomplete="off">
-							<div id="savedWalletInfo" class="notice saved-wallet-note hidden">
-								Saved wallet: <strong id="savedWalletAddress" class="break-anywhere">None</strong>
+							<div id="savedWalletInfo" class="wallet-unlock-summary hidden">
+								<span>Unlock saved wallet</span>
+								<strong id="savedWalletAddress">None</strong>
 							</div>
 							<div class="login-field-row">
 								<div id="pinEntryWrap" class="form-row">
-									<label id="loginSecretLabel" for="loginSecret">Quick-unlock PIN</label>
+									<label id="loginSecretLabel" for="pinInput">Quick-unlock PIN</label>
 									<div id="pinEntry" class="pin-entry" role="button" tabindex="0" aria-label="Enter PIN">
 										<span class="pin-box"></span>
 										<span class="pin-box"></span>
@@ -188,18 +188,16 @@
 								<div class="login-card locked-login-card">
 									<div id="lockedAvatarWrap" class="login-avatar-wrap hidden">
 										<div class="noverel-avatar-preview login-avatar-preview"><img id="lockedAvatarImage" alt=""></div>
-										<span>WELCOME BACK</span>
 									</div>
 									<div class="login-title-row locked-title-row">
-										<div>
-											<p class="login-copy">Unlock your saved wallet.</p>
+										<h2 class="login-title">WELCOME BACK</h2>
+										<div class="wallet-unlock-summary">
+											<span>Unlock saved wallet</span>
+											<strong id="lockedSavedWalletAddress">None</strong>
 										</div>
 									</div>
 
 									<form id="lockedUnlockForm" autocomplete="off">
-										<div class="notice saved-wallet-note locked-wallet-note">
-											Saved wallet: <strong id="lockedSavedWalletAddress" class="break-anywhere">None</strong>
-										</div>
 										<div class="login-field-row">
 											<div id="lockedPinEntryWrap" class="form-row">
 												<label for="lockedPinInput">Quick-unlock PIN</label>

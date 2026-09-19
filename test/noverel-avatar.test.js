@@ -70,9 +70,9 @@ test('Sweetwallet surfaces Avatar by Noverel without treating it as authenticati
 	const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 	const client = fs.readFileSync(path.join(root, 'sweetwallet.js'), 'utf8');
 	assert.match(html, /id="loginAvatarWrap"/);
-	assert.match(html, /id="loginAvatarWrap"[\s\S]*?<span>Welcome back<\/span>/);
+	assert.match(html, /id="loginAvatarWrap"[\s\S]*?login-avatar-preview/);
 	assert.match(html, /id="lockedAvatarWrap"/);
-	assert.match(html, /id="lockedAvatarWrap"[\s\S]*?<span>WELCOME BACK<\/span>/);
+	assert.match(html, /id="lockedAvatarWrap"[\s\S]*?login-avatar-preview/);
 	assert.match(html, /id="headerAvatarButton"/);
 	assert.match(html, /id="menuChooseAvatar"/);
 	assert.match(html, /id="avatarPickerModal"/);
@@ -100,12 +100,44 @@ test('automatic balance loading does not expose raw backend errors after login',
 	assert.doesNotMatch(client, /showToast\(error\.message \|\| 'Balance refresh failed\.'/);
 });
 
-test('top bar uses two balance decimals and hides its avatar on the main screen', () => {
+test('top bar removes two of eight balance decimals and shows its avatar only when unlocked', () => {
 	const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 	const client = fs.readFileSync(path.join(root, 'sweetwallet.js'), 'utf8');
 	assert.match(html, /id="refreshBalance"[\s\S]*?id="headerAvatarButton"[\s\S]*?id="menuToggle"/);
-	assert.match(client, /function formatHeaderBalance\(satoshis\)[\s\S]*?minimumFractionDigits: 2,[\s\S]*?maximumFractionDigits: 2/);
-	assert.match(client, /isMainScreen = activePanel && activePanel\.dataset\.panel === 'activity'/);
-	assert.match(client, /!entry \|\| !loggedIn \|\| isMainScreen/);
+	assert.match(client, /function formatHeaderBalance\(satoshis\)[\s\S]*?minimumFractionDigits: 6,[\s\S]*?maximumFractionDigits: 6/);
+	assert.match(client, /authenticated = loggedIn && !!state\.keys && state\.mode !== 'locked'/);
+	assert.match(client, /!entry \|\| !authenticated/);
 	assert.match(client, /panel\.classList\.toggle\('active', panel\.dataset\.panel === name\);[\s\S]*?renderAvatarSurfaces\(\)/);
+});
+
+test('saved-wallet unlock uses compact identity copy and keyboard-aware PIN layout', () => {
+	const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+	const css = fs.readFileSync(path.join(root, 'sweetwallet.css'), 'utf8');
+	const client = fs.readFileSync(path.join(root, 'sweetwallet.js'), 'utf8');
+	assert.doesNotMatch(html, /Saved wallet:/);
+	assert.match(html, /class="wallet-unlock-summary[^"]*"[\s\S]*?Unlock saved wallet[\s\S]*?id="savedWalletAddress"/);
+	assert.match(html, /class="wallet-unlock-summary[^"]*"[\s\S]*?Unlock saved wallet[\s\S]*?id="lockedSavedWalletAddress"/);
+	assert.match(css, /\.login-avatar-preview\s*\{[\s\S]*?width: 126px;[\s\S]*?height: 92px;[\s\S]*?border-radius: 28px/);
+	assert.match(css, /\.noverel-avatar-button\s*\{[\s\S]*?width: 60px;[\s\S]*?height: 46px;[\s\S]*?border-radius: 16px/);
+	assert.match(css, /body\.pin-focused[\s\S]*?#lockedPinEntryWrap[\s\S]*?\.pin-entry/);
+	assert.match(client, /window\.visualViewport\.addEventListener\('resize', syncPinViewportState/);
+	assert.match(client, /scrollIntoView\(\{ block: 'nearest', inline: 'nearest', behavior: 'auto' \}\)/);
+});
+
+test('locked startup refreshes the live balance using the saved public address', () => {
+	const client = fs.readFileSync(path.join(root, 'sweetwallet.js'), 'utf8');
+	assert.match(client, /balanceAddress = state\.address \|\| \(state\.savedVault && state\.savedVault\.address\) \|\| ''/);
+	assert.match(client, /requestBalance\(balanceAddress\)/);
+	assert.match(client, /if \(state\.savedVault\) \{[\s\S]*?setLoginMode\('pin'\);[\s\S]*?refreshBalance\(false\);[\s\S]*?startBalanceLoop\(\)/);
+});
+
+test('balance loading falls back to Esplora totals and spendable outputs', () => {
+	const client = fs.readFileSync(path.join(root, 'sweetwallet.js'), 'utf8');
+	assert.match(client, /function requestBalance\(address\)/);
+	assert.match(client, /requestApi\('\/balance\/' \+ encodedAddress\)/);
+	assert.match(client, /requestApi\('\/esplora\/address\/' \+ encodedAddress\)/);
+	assert.match(client, /chain\.funded_txo_sum[\s\S]*?chain\.spent_txo_sum/);
+	assert.match(client, /mempool\.funded_txo_sum[\s\S]*?mempool\.spent_txo_sum/);
+	assert.match(client, /requestApi\('\/unspent\/' \+ encodedAddress \+ '\?amount=0'\)/);
+	assert.match(client, /outputs\.reduce\(function \(total, output\)/);
 });

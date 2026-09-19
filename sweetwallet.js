@@ -202,8 +202,7 @@
 	function renderAvatarSurfaces() {
 		var entry = currentAvatar();
 		var loggedIn = !!state.address;
-		var activePanel = $('.panel.active');
-		var isMainScreen = activePanel && activePanel.dataset.panel === 'activity';
+		var authenticated = loggedIn && !!state.keys && state.mode !== 'locked';
 		var loginWrap = $('#loginAvatarWrap');
 		var lockedWrap = $('#lockedAvatarWrap');
 		if (loginWrap) {
@@ -216,7 +215,7 @@
 		}
 		var headerButton = $('#headerAvatarButton');
 		if (headerButton) {
-			headerButton.classList.toggle('hidden', !entry || !loggedIn || isMainScreen);
+			headerButton.classList.toggle('hidden', !entry || !authenticated);
 			if (entry) {
 				var headerImage = $('#headerAvatarImage');
 				headerImage.src = entry.imageUrl || entry.image;
@@ -611,6 +610,38 @@
 		});
 	}
 
+	function requestBalance(address) {
+		var encodedAddress = encodeURIComponent(address);
+		return requestApi('/balance/' + encodedAddress).then(function (data) {
+			var balance = Number(data && data.result && data.result.balance);
+			if (!Number.isFinite(balance)) {
+				throw new Error('The balance response was incomplete.');
+			}
+			return balance;
+		}).catch(function () {
+			return requestApi('/esplora/address/' + encodedAddress).then(function (data) {
+				var chain = data && data.chain_stats;
+				var mempool = data && data.mempool_stats;
+				if (!chain) {
+					throw new Error('The balance response was incomplete.');
+				}
+				var confirmed = Number(chain.funded_txo_sum || 0) - Number(chain.spent_txo_sum || 0);
+				var pending = mempool ? Number(mempool.funded_txo_sum || 0) - Number(mempool.spent_txo_sum || 0) : 0;
+				return Math.max(0, confirmed + pending);
+			}).catch(function () {
+				return requestApi('/unspent/' + encodedAddress + '?amount=0').then(function (data) {
+					var outputs = data && data.result;
+					if (!Array.isArray(outputs)) {
+						throw new Error('The balance response was incomplete.');
+					}
+					return outputs.reduce(function (total, output) {
+						return total + Number(output && output.value || 0);
+					}, 0);
+				});
+			});
+		});
+	}
+
 	function formatAmount(satoshis) {
 		var value = Number(satoshis || 0) / Math.pow(10, CONFIG.decimals);
 		return value.toLocaleString(undefined, {
@@ -630,8 +661,8 @@
 	function formatHeaderBalance(satoshis) {
 		var value = Number(satoshis || 0) / Math.pow(10, CONFIG.decimals);
 		return value.toLocaleString(undefined, {
-			minimumFractionDigits: 2,
-			maximumFractionDigits: 2
+			minimumFractionDigits: 6,
+			maximumFractionDigits: 6
 		});
 	}
 
@@ -1372,9 +1403,44 @@
 		}
 	}
 
+	function syncPinViewportState() {
+		var active = document.activeElement;
+		var pinFocused = active === $('#pinInput') || active === $('#lockedPinInput');
+		var viewport = window.visualViewport;
+		var visibleHeight = viewport ? viewport.height : window.innerHeight;
+		var keyboardOpen = pinFocused && viewport && window.innerHeight - viewport.height > 120;
+		var keyboardWasOpen = document.body.classList.contains('keyboard-open');
+		document.documentElement.style.setProperty('--visual-viewport-height', Math.round(visibleHeight) + 'px');
+		document.body.classList.toggle('pin-focused', pinFocused);
+		document.body.classList.toggle('keyboard-open', !!keyboardOpen);
+		if (keyboardOpen && !keyboardWasOpen) {
+			window.requestAnimationFrame(function () {
+				var entry = active === $('#lockedPinInput') ? $('#lockedPinEntry') : $('#pinEntry');
+				if (entry && typeof entry.scrollIntoView === 'function') {
+					entry.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
+				}
+			});
+		}
+	}
+
+	function revealFocusedPinArea(selector) {
+		syncPinViewportState();
+		window.requestAnimationFrame(function () {
+			var entry = $(selector);
+			if (entry && typeof entry.scrollIntoView === 'function') {
+				entry.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
+			}
+		});
+	}
+
 	function updateLoginUi() {
 		if (!$('#loginSecret')) {
 			return;
+		}
+		var loginScreen = $('#loginScreen');
+		if (loginScreen) {
+			loginScreen.classList.toggle('saved-wallet-login', !!state.savedVault);
+			loginScreen.dataset.loginMode = state.loginMode;
 		}
 		var input = $('#loginSecret');
 		var pinWrap = $('#pinEntryWrap');
@@ -1528,6 +1594,10 @@
 		if (!hasPin && state.lockedUnlockMode === 'pin') {
 			state.lockedUnlockMode = 'password';
 		}
+		var lockedCard = $('.locked-login-card');
+		if (lockedCard) {
+			lockedCard.dataset.unlockMode = state.lockedUnlockMode;
+		}
 		var pinWrap = $('#lockedPinEntryWrap');
 		var passwordWrap = $('#lockedPasswordWrap');
 		var submit = $('#unlockLockedSubmit');
@@ -1608,6 +1678,9 @@
 
 	function updateWalletUi() {
 		var loggedIn = !!state.address;
+		if (loggedIn && state.mode !== 'locked' && (document.activeElement === $('#pinInput') || document.activeElement === $('#lockedPinInput'))) {
+			document.activeElement.blur();
+		}
 		$('#loginScreen').classList.toggle('active', !loggedIn);
 		$('#walletScreen').classList.toggle('active', loggedIn);
 		$('#walletScreen').classList.toggle('wallet-locked', state.mode === 'locked');
@@ -1627,15 +1700,13 @@
 	}
 
 	function refreshBalance(showSuccess) {
-		if (!state.address) {
+		var balanceAddress = state.address || (state.savedVault && state.savedVault.address) || '';
+		if (!balanceAddress) {
 			return Promise.resolve(0);
 		}
 		updateBalanceUi(true);
-		return requestApi('/balance/' + encodeURIComponent(state.address)).then(function (data) {
-			if (data.error) {
-				throw new Error(data.error.message || 'Unable to load balance.');
-			}
-			state.balance = Number(data.result && data.result.balance || 0);
+		return requestBalance(balanceAddress).then(function (balance) {
+			state.balance = balance;
 			updateBalanceUi(false);
 			if (showSuccess) {
 				showToast('Balance refreshed from the live chain.');
@@ -3271,6 +3342,13 @@
 	}
 
 	function wireEvents() {
+		window.addEventListener('resize', syncPinViewportState, { passive: true });
+		if (window.visualViewport) {
+			window.visualViewport.addEventListener('resize', syncPinViewportState, { passive: true });
+			window.visualViewport.addEventListener('scroll', syncPinViewportState, { passive: true });
+		}
+		syncPinViewportState();
+
 		$$('[data-login-mode]').forEach(function (button) {
 			button.addEventListener('click', function () {
 				setLoginMode(button.dataset.loginMode);
@@ -3307,11 +3385,13 @@
 		});
 		$('#pinInput').addEventListener('focus', function () {
 			$('#pinEntry').classList.add('active');
+			revealFocusedPinArea('#pinEntry');
 		});
 		$('#pinInput').addEventListener('blur', function () {
 			if (!state.pinSubmitting) {
 				$('#pinEntry').classList.remove('active');
 			}
+			window.setTimeout(syncPinViewportState, 0);
 		});
 
 		$('#createWallet').addEventListener('click', function () {
@@ -3366,11 +3446,13 @@
 		});
 		$('#lockedPinInput').addEventListener('focus', function () {
 			$('#lockedPinEntry').classList.add('active');
+			revealFocusedPinArea('#lockedPinEntry');
 		});
 		$('#lockedPinInput').addEventListener('blur', function () {
 			if (!state.lockedPinSubmitting) {
 				$('#lockedPinEntry').classList.remove('active');
 			}
+			window.setTimeout(syncPinViewportState, 0);
 		});
 
 		$('#lockedUnlockForm').addEventListener('submit', function (event) {
@@ -3966,6 +4048,8 @@
 		renderSecurityUi();
 		if (state.savedVault) {
 			setLoginMode('pin');
+			refreshBalance(false);
+			startBalanceLoop();
 		} else if (state.publicWallet && state.publicWallet.address) {
 			openWatchOnly(state.publicWallet);
 		} else {
