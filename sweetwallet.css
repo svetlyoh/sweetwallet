@@ -1321,6 +1321,29 @@ select:focus {
 	line-height: 1.2;
 }
 
+.security-access-control {
+	display: grid;
+	gap: 7px;
+	padding: 12px;
+	border: 1px solid #dcece1;
+	border-radius: 14px;
+	background: rgba(3, 73, 39, 0.04);
+}
+
+.security-access-control p,
+.field-help {
+	margin: 0;
+	color: var(--sw-muted);
+	font-size: 0.86rem;
+	line-height: 1.4;
+}
+
+.security-access-status {
+	font-size: 0.86rem;
+	font-weight: 700;
+	color: #0a7a43;
+}
+
 .security-compact {
 	margin-top: 12px;
 }
@@ -1577,6 +1600,20 @@ select:focus {
 
 #walletScreen .security-group {
 	border-top-color: rgba(132, 217, 150, 0.18);
+}
+
+#walletScreen .security-access-control {
+	border-color: rgba(132, 217, 150, 0.18);
+	background: rgba(1, 63, 39, 0.34);
+}
+
+#walletScreen .security-access-control p,
+#walletScreen .field-help {
+	color: rgba(237, 255, 243, 0.72);
+}
+
+#walletScreen .security-access-status {
+	color: #a8ebba;
 }
 
 #walletScreen .check-row input {

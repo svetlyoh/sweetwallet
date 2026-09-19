@@ -13,6 +13,7 @@ const Vault = require('../wallet-vault.js');
 const SAMPLE_WIF = 'cSampleSugarchainPrivateKeyForVaultTestsOnly000000000000000000';
 const PASSWORD = 'correct horse battery staple';
 const NEW_PASSWORD = 'longer sweet wallet phrase';
+const PASSWORD_WITH_TRAILING_SPACE = 'correct horse battery staple ';
 const WALLET = {
 	privateKeyWif: SAMPLE_WIF,
 	address: 'sugar1qtestsweetwalletaddress0000000000000000000000',
@@ -61,6 +62,24 @@ test('does not serialize plaintext private key and can rewrap password', async (
 	const updated = await Vault.changePassword(record, PASSWORD, NEW_PASSWORD, { iterations: 1000 });
 	assert.equal(await Vault.decryptVault(updated, NEW_PASSWORD), SAMPLE_WIF);
 	await assert.rejects(() => Vault.decryptVault(updated, PASSWORD), /unlock/);
+});
+
+test('one exact wallet password supports PIN setup, unlock, and password changes', async () => {
+	const record = await Vault.createVault(WALLET, PASSWORD_WITH_TRAILING_SPACE, { iterations: 1000 });
+	const deviceKey = await crypto.subtle.importKey('raw', Vault.randomBytes(32), { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+	const vaultKey = await Vault.getVaultKeyBytes(record, PASSWORD_WITH_TRAILING_SPACE);
+	const quickUnlock = await Vault.wrapVaultKeyForPin(vaultKey, '1234', deviceKey, record);
+	record.quickUnlock = quickUnlock;
+	record.quickUnlock.pinLength = 4;
+
+	assert.equal(await Vault.decryptVault(record, PASSWORD_WITH_TRAILING_SPACE), SAMPLE_WIF, 'password unlock uses the saved password verbatim');
+	await assert.rejects(() => Vault.decryptVault(record, PASSWORD_WITH_TRAILING_SPACE.trim()), /unlock/, 'trimming changes the password');
+
+	const changed = await Vault.changePassword(record, PASSWORD_WITH_TRAILING_SPACE, NEW_PASSWORD, { iterations: 1000 });
+	assert.equal(await Vault.decryptVault(changed, NEW_PASSWORD), SAMPLE_WIF, 'the replacement password unlocks the same vault');
+	await assert.rejects(() => Vault.decryptVault(changed, PASSWORD_WITH_TRAILING_SPACE), /unlock/, 'the old password no longer unlocks');
+	const pinVaultKey = await Vault.unwrapVaultKeyWithPin(changed, '1234', deviceKey);
+	assert.equal(await Vault.decryptWithVaultKey(changed, pinVaultKey), SAMPLE_WIF, 'the existing PIN still unlocks after changing the wallet password');
 });
 
 test('accepts only 4 or 6 digit quick-unlock PINs', () => {

@@ -425,22 +425,39 @@
 								<div id="securityCapabilityNotice" class="notice warning">Saving the private key is optional. SweetWallet can keep this wallet session-only, or save it encrypted when this browser connection supports Web Crypto.</div>
 
 								<div class="security-stack">
-									<section class="security-group" aria-label="Wallet storage">
-										<h3>Wallet Storage</h3>
-										<form id="saveVaultForm" autocomplete="off">
-											<div class="form-row">
-												<label for="savePassword">New wallet password</label>
-												<input id="savePassword" type="password" autocomplete="new-password" placeholder="At least 10 characters">
-											</div>
-											<div class="form-row">
-												<label for="savePasswordConfirm">Confirm wallet password</label>
-												<input id="savePasswordConfirm" type="password" autocomplete="new-password">
-											</div>
-											<button id="saveVaultButton" class="button" type="submit">
-												<i data-lucide="save"></i>
-												Save Private Key on This Device
-											</button>
-										</form>
+									<section class="security-group" aria-label="Wallet access">
+										<h3>Wallet Access</h3>
+										<div class="security-access-control">
+											<strong>Password</strong>
+											<p>Protects your encrypted wallet and can always be used to unlock it.</p>
+											<div id="walletPasswordStatus" class="security-access-status">Not set</div>
+											<button id="saveWalletAccessButton" class="button" type="button"><i data-lucide="save"></i>Save Wallet &amp; Set Password</button>
+											<button id="changeWalletPasswordButton" class="button subtle hidden" type="button"><i data-lucide="key"></i>Change Password</button>
+										</div>
+										<div class="security-access-control">
+											<strong>Quick PIN</strong>
+											<p>Optional faster unlock on this browser.</p>
+											<div id="walletPinStatus" class="security-access-status">Unavailable until wallet password is set</div>
+											<button id="setupPinAccessButton" class="button subtle" type="button"><i data-lucide="shield-plus"></i>Set Up PIN</button>
+										</div>
+										<div class="form-row">
+											<label for="autoLockTimeout">Auto-Lock</label>
+											<select id="autoLockTimeout">
+												<option value="0">Immediately</option>
+												<option value="60000">After 1 minute</option>
+												<option value="300000">After 5 minutes</option>
+												<option value="900000">After 15 minutes</option>
+												<option value="1800000">After 30 minutes</option>
+												<option value="3600000">After 1 hour</option>
+												<option value="-1">Never</option>
+											</select>
+										</div>
+										<button id="lockNowButton" class="button subtle" type="button"><i data-lucide="lock"></i>Lock Wallet Now</button>
+									</section>
+
+									<section class="security-group" aria-label="Wallet data">
+										<h3>Wallet Data</h3>
+										<div id="walletDataStatus" class="notice">Wallet data status loading...</div>
 										<button id="sessionOnlyButton" class="button subtle" type="button">
 											<i data-lucide="monitor-x"></i>
 											Do Not Save Private Key
@@ -469,65 +486,6 @@
 											<i data-lucide="unlink"></i>
 											Disconnect Wallet
 										</button>
-									</section>
-
-									<section class="security-group" aria-label="Wallet lock">
-										<h3>Wallet Lock</h3>
-										<form id="changePasswordForm" autocomplete="off">
-											<div class="form-row">
-												<label for="currentPassword">Current wallet password</label>
-												<input id="currentPassword" type="password" autocomplete="current-password">
-											</div>
-											<div class="form-row">
-												<label for="newPassword">New wallet password</label>
-												<input id="newPassword" type="password" autocomplete="new-password">
-											</div>
-											<div class="form-row">
-												<label for="newPasswordConfirm">Confirm new password</label>
-												<input id="newPasswordConfirm" type="password" autocomplete="new-password">
-											</div>
-											<button id="changePasswordButton" class="button subtle" type="submit">
-												<i data-lucide="key"></i>
-												Change Wallet Password
-											</button>
-										</form>
-										<form id="pinForm" autocomplete="off">
-											<div class="form-row">
-												<label for="pinPassword">Wallet password</label>
-												<input id="pinPassword" type="password" autocomplete="current-password">
-											</div>
-											<div class="form-row">
-												<label for="quickPin">Quick-unlock PIN</label>
-												<input id="quickPin" type="password" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="4 or 6 digits">
-											</div>
-											<button id="setPinButton" class="button subtle" type="submit">
-												<i data-lucide="hash"></i>
-												Set or Change Quick-Unlock PIN
-											</button>
-										</form>
-										<button id="disablePinButton" class="button subtle" type="button">
-											<i data-lucide="x-circle"></i>
-											Disable Quick-Unlock PIN
-										</button>
-										<div class="form-row">
-											<label for="autoLockTimeout">Auto-Lock Timeout</label>
-											<select id="autoLockTimeout">
-												<option value="0">Immediately</option>
-												<option value="60000">After 1 minute</option>
-												<option value="300000">After 5 minutes</option>
-												<option value="900000">After 15 minutes</option>
-												<option value="1800000">After 30 minutes</option>
-												<option value="-1">Never</option>
-											</select>
-										</div>
-										<button id="lockNowButton" class="button subtle" type="button">
-											<i data-lucide="lock"></i>
-											Lock Wallet Now
-										</button>
-										<label class="check-row disabled">
-											<input id="biometricsSetting" type="checkbox" disabled>
-											<span>Require Device Biometrics <small>Native app only</small></span>
-										</label>
 									</section>
 
 									<section class="security-group" aria-label="Security key">
@@ -799,7 +757,7 @@
 					</div>
 				</div>
 				<div id="pinSetupPasswordStep" class="pin-setup-step">
-					<div class="notice">Protect this wallet on this browser with a wallet password. SweetWallet encrypts your private key before saving it locally.</div>
+					<div class="notice">Your wallet password encrypts this saved wallet and can always be used instead of your PIN.</div>
 					<div class="form-row">
 						<label for="setupWalletPassword">Wallet password</label>
 						<input id="setupWalletPassword" type="password" autocomplete="new-password" placeholder="At least 10 characters">
@@ -812,7 +770,8 @@
 				<div id="pinSetupPinStep" class="pin-setup-step hidden">
 					<div class="notice">Now pick a 4 or 6 digit PIN for quick unlock on this browser.</div>
 					<div id="setupPinPasswordWrap" class="form-row hidden">
-						<label for="setupPinPassword">Wallet password</label>
+						<label for="setupPinPassword">Current wallet password</label>
+						<p class="field-help">Use the same wallet password you use to unlock SweetWallet.</p>
 						<input id="setupPinPassword" type="password" autocomplete="current-password" placeholder="Enter wallet password">
 					</div>
 					<div class="form-row">
@@ -869,6 +828,29 @@
 				<div class="modal-actions">
 					<button id="cancelPinSetup" class="button secondary" type="button">Cancel</button>
 					<button id="continuePinSetup" class="button" type="submit">Continue</button>
+				</div>
+			</form>
+		</div>
+
+		<div id="changePasswordModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="changePasswordTitle">
+			<form id="changePasswordModalForm" class="modal-card" autocomplete="off">
+				<h2 id="changePasswordTitle">Change Wallet Password</h2>
+				<div class="notice">This is the one password that protects and unlocks your saved wallet.</div>
+				<div class="form-row">
+					<label for="currentPassword">Current wallet password</label>
+					<input id="currentPassword" type="password" autocomplete="current-password">
+				</div>
+				<div class="form-row">
+					<label for="newPassword">New wallet password</label>
+					<input id="newPassword" type="password" autocomplete="new-password">
+				</div>
+				<div class="form-row">
+					<label for="newPasswordConfirm">Confirm new password</label>
+					<input id="newPasswordConfirm" type="password" autocomplete="new-password">
+				</div>
+				<div class="modal-actions">
+					<button id="cancelChangePassword" class="button secondary" type="button">Cancel</button>
+					<button id="changePasswordButton" class="button" type="submit">Change Password</button>
 				</div>
 			</form>
 		</div>

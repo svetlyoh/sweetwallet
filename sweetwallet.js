@@ -1585,7 +1585,7 @@
 			submitPinLogin();
 			return;
 		}
-		var value = $('#loginSecret').value.trim();
+		var value = $('#loginSecret').value;
 		var button = $('#loginSubmit');
 		if (!value) {
 			showToast('Enter your wallet password.', 'danger');
@@ -2202,9 +2202,27 @@
 			state.mode === 'locked' ? 'Saved and locked' :
 				state.mode === 'watch' ? 'Watch-only' :
 					state.mode === 'session' ? 'Session-only' : 'Closed';
-		var vaultLabel = vault ? 'encrypted private key saved' : 'no saved private key';
-		var pinLabel = hasQuickPin(vault) ? 'PIN enabled' : 'PIN disabled';
+		var hasVault = !!vault;
+		var hasPin = hasQuickPin(vault);
+		var canSign = !!state.keys;
+		var vaultLabel = hasVault ? 'encrypted private key saved' : 'no saved private key';
+		var pinLabel = hasPin ? 'PIN enabled' : 'PIN disabled';
 		$('#securityStatus').textContent = modeLabel + ': ' + vaultLabel + ', ' + pinLabel + ', ' + securityKeys.length + ' security key' + (securityKeys.length === 1 ? '' : 's') + '.';
+		$('#walletPasswordStatus').textContent = hasVault ? 'Set' : 'Not set';
+		$('#walletPinStatus').textContent = !hasVault ? 'Unavailable until wallet password is set' :
+			(hasPin ? 'Enabled \u00b7 ' + quickPinLength(vault) + ' digits' : 'Disabled');
+		$('#walletDataStatus').textContent = hasVault ?
+			'Encrypted wallet saved on this browser.' :
+			(canSign ? 'Session-only wallet. This private key will not remain saved after the session ends.' : 'No private key is saved on this browser.');
+		$('#saveWalletAccessButton').classList.toggle('hidden', hasVault || !canSign);
+		$('#changeWalletPasswordButton').classList.toggle('hidden', !hasVault);
+		$('#setupPinAccessButton').textContent = hasPin ? 'Manage PIN' : 'Set Up PIN';
+		setDisabled('#setupPinAccessButton', !hasVault || !canSign, !hasVault ? 'Set a wallet password before enabling a Quick PIN.' : 'Unlock the wallet before managing its PIN.');
+		$('#sessionOnlyButton').classList.toggle('hidden', !hasVault);
+		$('#removeSavedKeyButton').classList.toggle('hidden', !hasVault);
+		$('#watchOnlyButton').classList.toggle('hidden', !state.address);
+		$('#exportBackupButton').classList.toggle('hidden', !hasVault && !canSign);
+		$('#deleteWalletButton').classList.toggle('hidden', !state.address);
 		setSecurityCapabilityNotice();
 		$('#autoLockTimeout').value = String(state.settings.autoLockMs);
 		$('#securityKeyRequired').checked = !!state.settings.requireSecurityKeyBeforeSend;
@@ -2859,11 +2877,12 @@
 		var isChange = state.pinSetup.step === 'change';
 		var isDelete = state.pinSetup.step === 'delete';
 		var isBlocked = state.pinSetup.step === 'blocked';
+		var isSavingWallet = state.pinSetup.action === 'save-wallet';
 		var title = isBackup ? 'Save your private key' :
 			isComplete ? 'Wallet ready' :
 			isManage ? 'Manage PIN' :
 			isChange ? 'Change PIN' :
-				isDelete ? 'Delete PIN' : 'Set up PIN';
+				isDelete ? 'Delete PIN' : (isSavingWallet ? 'Set Wallet Password' : 'Set up PIN');
 		$('#pinSetupTitle').textContent = title;
 		$('#pinSetupStepLabel').textContent = isBackup ? 'Step 1 of 3' :
 			isComplete ? 'Setup complete' :
@@ -2871,7 +2890,7 @@
 			isChange ? 'Change PIN' :
 				isDelete ? 'Delete PIN' :
 					isBlocked ? 'Setup paused' :
-						(state.pinSetup.newWallet ? (isPin ? 'Step 3 of 3' : 'Step 2 of 3') : (isPin ? 'Step 2 of 2' : 'Step 1 of 2'));
+						(isSavingWallet ? 'Password setup' : (state.pinSetup.newWallet ? (isPin ? 'Step 3 of 3' : 'Step 2 of 3') : (isPin ? 'Step 2 of 2' : 'Step 1 of 2')));
 		$('#pinSetupBackupStep').classList.toggle('hidden', !isBackup);
 		$('#pinSetupManageStep').classList.toggle('hidden', !isManage);
 		$('#pinSetupPasswordStep').classList.toggle('hidden', !isPassword);
@@ -2898,7 +2917,7 @@
 			isChange ? 'Change PIN' :
 			isPin ? 'Enable PIN' :
 				isComplete ? 'Go to Wallet' :
-					isBackup ? 'Continue' : 'Save Password';
+					isBackup ? 'Continue' : (isSavingWallet ? 'Save Wallet' : 'Save Password');
 		$('#cancelPinSetup').textContent = isManage || isBlocked || isComplete ? 'Close' :
 			(isChange || isDelete ? 'Back' : 'Cancel');
 		$('#pinSetupForm .modal-actions').classList.toggle('manage-only', isManage || isBlocked);
@@ -2969,6 +2988,71 @@
 			return;
 		}
 		setPinSetupStep(newWallet ? 'backup' : (state.savedVault ? 'pin' : 'password'));
+	}
+
+	function openWalletPasswordSetupFlow() {
+		if (!state.keys || state.savedVault) {
+			showToast(state.savedVault ? 'This wallet already has a password.' : 'Unlock the wallet before saving it on this browser.', 'danger');
+			return;
+		}
+		state.pinSetup.action = 'save-wallet';
+		state.pinSetup.newWallet = false;
+		state.pinSetup.password = '';
+		state.pinSetup.backupWif = '';
+		state.pinSetup.backupRevealed = false;
+		clearPinSetupFields();
+		$('#pinSetupModal').classList.add('active');
+		var cryptoError = vaultAvailabilityError();
+		if (cryptoError) {
+			setPinSetupStep('blocked', cryptoError);
+			showToast(cryptoError, 'danger');
+			return;
+		}
+		setPinSetupStep('password');
+	}
+
+	function openChangePasswordFlow() {
+		if (!state.savedVault) {
+			showToast('Save the wallet before changing its password.', 'danger');
+			return;
+		}
+		['#currentPassword', '#newPassword', '#newPasswordConfirm'].forEach(function (selector) {
+			$(selector).value = '';
+		});
+		$('#changePasswordModal').classList.add('active');
+		window.setTimeout(function () { $('#currentPassword').focus(); }, 0);
+	}
+
+	function closeChangePasswordFlow() {
+		['#currentPassword', '#newPassword', '#newPasswordConfirm'].forEach(function (selector) {
+			$(selector).value = '';
+		});
+		$('#changePasswordModal').classList.remove('active');
+	}
+
+	function submitChangePasswordFlow() {
+		if (!state.savedVault) {
+			showToast('Save the wallet before changing its password.', 'danger');
+			return;
+		}
+		var currentPassword = $('#currentPassword').value;
+		var newPassword = $('#newPassword').value;
+		var confirmPassword = $('#newPasswordConfirm').value;
+		if (newPassword !== confirmPassword) {
+			showToast('New wallet passwords do not match.', 'danger');
+			return;
+		}
+		var button = $('#changePasswordButton');
+		setBusy(button, true, 'Updating...');
+		Vault.changePassword(state.savedVault, currentPassword, newPassword).then(function (record) {
+			saveVaultRecord(record);
+			closeChangePasswordFlow();
+			showToast('Wallet password changed. Your Quick PIN still works.');
+		}).catch(function (error) {
+			showToast(error.message || 'Wallet password could not be changed.', 'danger');
+		}).finally(function () {
+			setBusy(button, false);
+		});
 	}
 
 	function closePinSetupFlow() {
@@ -3246,10 +3330,15 @@
 			cancelButton.disabled = true;
 			setBusy(button, true, 'Saving...');
 			saveCurrentPrivateKey(password).then(function () {
-				state.pinSetup.password = password;
 				$('#setupWalletPassword').value = '';
 				$('#setupWalletPasswordConfirm').value = '';
 				setSecurityCapabilityNotice('Private key saved encrypted on this device.');
+				if (state.pinSetup.action === 'save-wallet') {
+					closePinSetupFlow();
+					showToast('Wallet saved and protected with your wallet password.');
+					return;
+				}
+				state.pinSetup.password = password;
 				setPinSetupStep('pin');
 				showToast('Wallet saved. Now choose your PIN.');
 			}).catch(function (error) {
@@ -3644,7 +3733,7 @@
 			});
 		});
 
-		['#setupQuickPin', '#setupQuickPinConfirm', '#quickPin', '#changeOldPin', '#changeNewPin', '#changeNewPinConfirm', '#deletePinCurrent'].forEach(function (selector) {
+		['#setupQuickPin', '#setupQuickPinConfirm', '#changeOldPin', '#changeNewPin', '#changeNewPinConfirm', '#deletePinCurrent'].forEach(function (selector) {
 			var input = $(selector);
 			if (input) {
 				input.addEventListener('input', function () {
@@ -3661,33 +3750,20 @@
 			});
 		});
 
-		$('#saveVaultForm').addEventListener('submit', function (event) {
-			event.preventDefault();
-			var password = $('#savePassword').value;
-			var confirmPassword = $('#savePasswordConfirm').value;
-			if (password !== confirmPassword) {
-				showToast('Wallet passwords do not match.', 'danger');
+		$('#saveWalletAccessButton').addEventListener('click', openWalletPasswordSetupFlow);
+		$('#changeWalletPasswordButton').addEventListener('click', openChangePasswordFlow);
+		$('#setupPinAccessButton').addEventListener('click', function () {
+			if (!state.savedVault) {
+				showToast('Set a wallet password before enabling a Quick PIN.', 'danger');
 				return;
 			}
-			var button = $('#saveVaultButton');
-			setBusy(button, true, 'Encrypting...');
-			Promise.resolve().then(function () {
-				return saveCurrentPrivateKey(password);
-			}).then(function () {
-				$('#savePassword').value = '';
-				$('#savePasswordConfirm').value = '';
-				setSecurityCapabilityNotice('Private key saved encrypted on this device.');
-				showToast('Private key saved encrypted on this device.');
-			}).catch(function (error) {
-				var message = error.message || 'Private key could not be saved.';
-				if (/HTTPS|localhost|Web Crypto|Secure browser crypto|Secure random/i.test(message)) {
-					setSecurityCapabilityNotice(message + ' You can continue using this wallet session-only, or reopen SweetWallet from a trusted HTTPS address to save it encrypted.', 'danger');
-				}
-				showToast(message, 'danger');
-			}).finally(function () {
-				setBusy(button, false);
-			});
+			openPinSetupFlow();
 		});
+		$('#changePasswordModalForm').addEventListener('submit', function (event) {
+			event.preventDefault();
+			submitChangePasswordFlow();
+		});
+		$('#cancelChangePassword').addEventListener('click', closeChangePasswordFlow);
 
 		$('#sessionOnlyButton').addEventListener('click', function () {
 			if (!state.savedVault) {
@@ -3795,73 +3871,6 @@
 
 		$('#deleteWalletButton').addEventListener('click', function () {
 			openDisconnectFlow();
-		});
-
-		$('#changePasswordForm').addEventListener('submit', function (event) {
-			event.preventDefault();
-			if (!state.savedVault) {
-				showToast('Save the private key before changing a wallet password.', 'danger');
-				return;
-			}
-			if ($('#newPassword').value !== $('#newPasswordConfirm').value) {
-				showToast('New wallet passwords do not match.', 'danger');
-				return;
-			}
-			var button = $('#changePasswordButton');
-			setBusy(button, true, 'Updating...');
-			Vault.changePassword(state.savedVault, $('#currentPassword').value, $('#newPassword').value).then(function (record) {
-				saveVaultRecord(record);
-				$('#currentPassword').value = '';
-				$('#newPassword').value = '';
-				$('#newPasswordConfirm').value = '';
-				showToast('Wallet password changed.');
-			}).catch(function (error) {
-				showToast(error.message || 'Wallet password could not be changed.', 'danger');
-			}).finally(function () {
-				setBusy(button, false);
-			});
-		});
-
-		$('#pinForm').addEventListener('submit', function (event) {
-			event.preventDefault();
-			if (!state.savedVault) {
-				showToast('Save the private key before enabling quick-unlock PIN.', 'danger');
-				return;
-			}
-			var button = $('#setPinButton');
-			setBusy(button, true, 'Protecting...');
-			enableQuickUnlockPin($('#pinPassword').value, $('#quickPin').value).then(function () {
-				$('#pinPassword').value = '';
-				$('#quickPin').value = '';
-				showToast('Quick-unlock PIN enabled. The PIN is combined with this browser device key.');
-			}).catch(function (error) {
-				showToast(error.message || 'Quick-unlock PIN could not be enabled.', 'danger');
-			}).finally(function () {
-				setBusy(button, false);
-			});
-		});
-
-		$('#disablePinButton').addEventListener('click', function () {
-			if (!state.savedVault || !hasQuickPin(state.savedVault)) {
-				showToast('Quick-unlock PIN is already disabled.');
-				return;
-			}
-			requireSavedWalletPassword('Enter your wallet password to disable quick-unlock PIN.').then(function () {
-				var record = JSON.parse(JSON.stringify(state.savedVault));
-				record.quickUnlock = {
-					enabled: false,
-					version: 1
-				};
-				record.updatedAt = new Date().toISOString();
-				saveVaultRecord(record);
-				return deleteDeviceKey();
-			}).then(function () {
-				state.settings.requirePinBeforeSend = false;
-				saveSettings();
-				showToast('Quick-unlock PIN disabled.');
-			}).catch(function (error) {
-				showToast(error.message || 'Quick-unlock PIN was not disabled.', 'danger');
-			});
 		});
 
 		$('#autoLockTimeout').addEventListener('change', function () {
