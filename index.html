@@ -74,9 +74,8 @@
 						</button>
 						<div class="login-title-row">
 							<div class="login-heading">
-								<div class="login-eyebrow"><i data-lucide="shield-check"></i><span>Local &amp; encrypted</span></div>
 								<h2 class="login-title">WELCOME BACK</h2>
-								<p class="login-copy">Unlock a saved wallet, or use a private key for this session.</p>
+								<p id="loginCopy" class="login-copy">Open a saved wallet or create a new one.</p>
 							</div>
 						</div>
 
@@ -104,6 +103,7 @@
 									<button class="mode-pill" type="button" data-login-mode="password">Password</button>
 									<button class="mode-pill" type="button" data-login-mode="privateKey">Private key</button>
 								</div>
+								<p id="loginModeNotice" class="login-mode-notice hidden" role="status"></p>
 								<div id="loginSecretWrap" class="form-row login-secret-wrap hidden">
 									<label id="loginTextLabel" for="loginSecret">Wallet password</label>
 									<input id="loginSecret" type="password" inputmode="text" autocomplete="off" placeholder="Enter wallet password">
@@ -124,7 +124,6 @@
 								</button>
 							</div>
 						</div>
-						<div id="newWalletNotice" class="notice login-helper-note hidden" aria-live="polite"><i data-lucide="shield"></i><span>This new wallet is only available for now. To keep it on this device, save it with a password in the Security menu.</span></div>
 					</div>
 				</section>
 
@@ -140,6 +139,7 @@
 								<span>Receive</span>
 							</button>
 						</section>
+						<div id="newWalletNotice" class="notice new-wallet-notice hidden" aria-live="polite"><i data-lucide="shield"></i><span>This new wallet is only available for now. To keep it on this device, save it with a password in the Security menu.</span></div>
 
 						<section class="wallet-card" aria-label="Wallet overview">
 							<div class="wallet-top">
@@ -180,53 +180,6 @@
 											<i data-lucide="copy"></i>
 										</button>
 									</div>
-								</div>
-							</div>
-
-							<div class="panel locked-panel" data-panel="locked">
-								<div class="login-card locked-login-card">
-									<div id="lockedAvatarWrap" class="login-avatar-wrap hidden">
-										<div class="noverel-avatar-preview login-avatar-preview"><img id="lockedAvatarImage" alt=""></div>
-									</div>
-									<div class="login-title-row locked-title-row">
-										<h2 class="login-title">WELCOME BACK</h2>
-										<div class="wallet-unlock-summary">
-											<span>Unlock saved wallet</span>
-											<strong id="lockedSavedWalletAddress">None</strong>
-										</div>
-									</div>
-
-									<form id="lockedUnlockForm" autocomplete="off">
-										<div class="login-field-row">
-											<div id="lockedPinEntryWrap" class="form-row">
-												<label for="lockedPinInput">Quick-unlock PIN</label>
-												<div id="lockedPinEntry" class="pin-entry" role="button" tabindex="0" aria-label="Enter PIN">
-													<span class="pin-box"></span>
-													<span class="pin-box"></span>
-													<span class="pin-box"></span>
-													<span class="pin-box"></span>
-													<span class="pin-box"></span>
-													<span class="pin-box"></span>
-												</div>
-												<input id="lockedPinInput" class="pin-input" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" aria-hidden="true">
-											</div>
-											<div class="login-mode-toggle locked-mode-toggle" role="group" aria-label="Unlock method">
-												<span class="mode-slider" aria-hidden="true"></span>
-												<button class="mode-pill active" type="button" data-locked-mode="pin">PIN</button>
-												<button class="mode-pill" type="button" data-locked-mode="password">Password</button>
-											</div>
-											<div id="lockedPasswordWrap" class="form-row login-secret-wrap hidden">
-												<label for="lockedPassword">Wallet password</label>
-												<input id="lockedPassword" type="password" inputmode="text" autocomplete="current-password" placeholder="Enter wallet password">
-											</div>
-										</div>
-										<button id="unlockLockedSubmit" class="button hidden" type="submit">
-											<i data-lucide="lock-keyhole-open"></i>
-											Log In
-										</button>
-									</form>
-
-									<div class="notice login-helper-note">Your saved wallet is locked. Activity and receive info can remain visible, but sending requires unlocking the encrypted private key.</div>
 								</div>
 							</div>
 
@@ -989,6 +942,7 @@
 		<script src="lib/bitcoinjs-4.0.3-browser.js"></script>
 		<script src="wallet-vault.js"></script>
 		<script src="noverel-avatar.js"></script>
+		<script src="sweetwallet-access.js"></script>
 		<script src="sweetwallet.js"></script>
 		<script src="keylink-crypto.js"></script>
 		<script src="keylink-storage.js"></script>

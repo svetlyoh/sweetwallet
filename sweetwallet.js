@@ -30,7 +30,9 @@
 
 	var Vault = window.SweetWalletVault;
 	var Avatar = window.NoverelAvatar;
+	var Access = window.SweetWalletAccess;
 	var avatarManager = null;
+	var screenVisibilityObserver = null;
 	var STORAGE = {
 		vault: 'sweetwallet_vault_v1',
 		publicWallet: 'sweetwallet_public_wallet_v1',
@@ -46,10 +48,8 @@
 		publicKeyHex: '',
 		walletId: '',
 		mode: 'closed',
-		loginMode: 'pin',
+		loginMode: 'privateKey',
 		pinSubmitting: false,
-		lockedUnlockMode: 'pin',
-		lockedPinSubmitting: false,
 		savedVault: null,
 		publicWallet: null,
 		settings: defaultSettings(),
@@ -201,21 +201,15 @@
 
 	function renderAvatarSurfaces() {
 		var entry = currentAvatar();
-		var loggedIn = !!state.address;
-		var authenticated = loggedIn && !!state.keys && state.mode !== 'locked';
+		var loginVisible = Access.accessRequired(state.mode);
 		var loginWrap = $('#loginAvatarWrap');
-		var lockedWrap = $('#lockedAvatarWrap');
 		if (loginWrap) {
-			loginWrap.classList.toggle('hidden', !entry || loggedIn);
+			loginWrap.classList.toggle('hidden', !Access.loginAvatarVisible(state.mode, entry));
 			renderAvatarPreview('#loginAvatarWrap .login-avatar-preview', entry, 'key-round');
-		}
-		if (lockedWrap) {
-			lockedWrap.classList.toggle('hidden', !entry || state.mode !== 'locked');
-			renderAvatarPreview('#lockedAvatarWrap .login-avatar-preview', entry, 'key-round');
 		}
 		var headerButton = $('#headerAvatarButton');
 		if (headerButton) {
-			headerButton.classList.toggle('hidden', !entry || !authenticated);
+			headerButton.classList.toggle('hidden', !Access.headerAvatarVisible(state.mode, state.keys, entry) || loginVisible);
 			if (entry) {
 				var headerImage = $('#headerAvatarImage');
 				headerImage.src = entry.imageUrl || entry.image;
@@ -1316,17 +1310,10 @@
 			button.disabled = !canSign;
 			button.title = canSign ? '' : 'Open and unlock a SUGAR wallet before using Keylink.';
 		});
-		if ($('#savedWalletInfo')) {
-			$('#savedWalletInfo').classList.toggle('hidden', !state.savedVault);
-		}
-		if ($('#savedWalletAddress')) {
-			$('#savedWalletAddress').textContent = state.savedVault ? shortAddress(state.savedVault.address) : 'None';
-		}
 		if (isLocked) {
 			$('#securityStatus').textContent = 'Wallet is locked. Unlock it before saving new credentials or sending.';
 		}
 		updateLoginUi();
-		updateLockedUi();
 		updateMenuUi();
 		updatePinSetupCta();
 	}
@@ -1367,7 +1354,7 @@
 
 	function setLoginMode(mode) {
 		if (['pin', 'password', 'privateKey'].indexOf(mode) < 0) {
-			mode = 'pin';
+			mode = Access.initialLoginMode(state.savedVault);
 		}
 		state.loginMode = mode;
 		if ($('#loginSecret')) {
@@ -1405,7 +1392,7 @@
 
 	function syncPinViewportState() {
 		var active = document.activeElement;
-		var pinFocused = active === $('#pinInput') || active === $('#lockedPinInput');
+		var pinFocused = active === $('#pinInput');
 		var viewport = window.visualViewport;
 		var visibleHeight = viewport ? viewport.height : window.innerHeight;
 		var keyboardOpen = pinFocused && viewport && window.innerHeight - viewport.height > 120;
@@ -1415,7 +1402,7 @@
 		document.body.classList.toggle('keyboard-open', !!keyboardOpen);
 		if (keyboardOpen && !keyboardWasOpen) {
 			window.requestAnimationFrame(function () {
-				var entry = active === $('#lockedPinInput') ? $('#lockedPinEntry') : $('#pinEntry');
+				var entry = $('#pinEntry');
 				if (entry && typeof entry.scrollIntoView === 'function') {
 					entry.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
 				}
@@ -1442,11 +1429,26 @@
 			loginScreen.classList.toggle('saved-wallet-login', !!state.savedVault);
 			loginScreen.dataset.loginMode = state.loginMode;
 		}
+		var savedVault = state.savedVault;
+		var presentation = Access.loginPresentation(state.loginMode, savedVault);
+		var availability = presentation.availability;
 		var input = $('#loginSecret');
 		var pinWrap = $('#pinEntryWrap');
 		var textWrap = $('#loginSecretWrap');
 		var textLabel = $('#loginTextLabel');
 		var submit = $('#loginSubmit');
+		var notice = $('#loginModeNotice');
+		var copy = $('#loginCopy');
+		var savedWalletInfo = $('#savedWalletInfo');
+		if (copy) {
+			copy.textContent = savedVault ? '' : 'Open a saved wallet or create a new one.';
+		}
+		if (savedWalletInfo) {
+			savedWalletInfo.classList.toggle('hidden', !savedVault);
+		}
+		if ($('#savedWalletAddress')) {
+			$('#savedWalletAddress').textContent = savedVault ? shortAddress(savedVault.address) : 'None';
+		}
 		var toggle = $('.login-mode-toggle');
 		if (toggle) {
 			toggle.dataset.mode = state.loginMode;
@@ -1454,10 +1456,16 @@
 		$$('[data-login-mode]').forEach(function (button) {
 			button.classList.toggle('active', button.dataset.loginMode === state.loginMode);
 		});
-		if (state.loginMode === 'password') {
-			pinWrap.classList.add('hidden');
-			textWrap.classList.remove('hidden');
-			submit.classList.remove('hidden');
+		if (notice) {
+			notice.textContent = availability.message;
+			notice.classList.toggle('hidden', availability.available);
+		}
+		pinWrap.classList.toggle('hidden', !presentation.pinVisible);
+		textWrap.classList.toggle('hidden', !presentation.secretVisible);
+		submit.classList.toggle('hidden', !presentation.submitVisible);
+		if (!availability.available) {
+			// The compact availability notice is the only control shown for unavailable methods.
+		} else if (state.loginMode === 'password') {
 			textLabel.textContent = 'Wallet password';
 			input.type = 'password';
 			input.inputMode = 'text';
@@ -1465,9 +1473,6 @@
 			input.placeholder = state.savedVault ? 'Enter wallet password' : 'Save a wallet first';
 			submit.innerHTML = '<i data-lucide="lock-keyhole-open"></i> Log In';
 		} else if (state.loginMode === 'privateKey') {
-			pinWrap.classList.add('hidden');
-			textWrap.classList.remove('hidden');
-			submit.classList.remove('hidden');
 			textLabel.textContent = 'Private key';
 			input.type = 'password';
 			input.inputMode = 'text';
@@ -1475,9 +1480,6 @@
 			input.placeholder = 'Paste Sugarchain private key';
 			submit.innerHTML = '<i data-lucide="key-round"></i> Log In';
 		} else {
-			pinWrap.classList.remove('hidden');
-			textWrap.classList.add('hidden');
-			submit.classList.add('hidden');
 			updatePinBoxes();
 		}
 		if (window.lucide) {
@@ -1487,6 +1489,10 @@
 
 	function submitPinLogin() {
 		if (state.pinSubmitting) {
+			return;
+		}
+		if (!Access.loginModeAvailability('pin', state.savedVault).available) {
+			updateLoginUi();
 			return;
 		}
 		var value = pinValue();
@@ -1511,6 +1517,10 @@
 	}
 
 	function submitLogin() {
+		if (!Access.loginModeAvailability(state.loginMode, state.savedVault).available) {
+			updateLoginUi();
+			return;
+		}
 		if (state.loginMode === 'pin') {
 			submitPinLogin();
 			return;
@@ -1544,149 +1554,52 @@
 		});
 	}
 
-	function lockedPinValue() {
-		return normalizePin($('#lockedPinInput') && $('#lockedPinInput').value, quickPinLength(state.savedVault));
-	}
-
-	function updateLockedPinBoxes() {
-		var value = lockedPinValue();
-		var length = quickPinLength(state.savedVault);
-		if ($('#lockedPinInput')) {
-			$('#lockedPinInput').value = value;
-			$('#lockedPinInput').maxLength = length;
-		}
-		if ($('#lockedPinEntry')) {
-			$('#lockedPinEntry').dataset.length = String(length);
-		}
-		$$('#lockedPinEntry .pin-box').forEach(function (box, index) {
-			box.classList.toggle('pin-box-unused', index >= length);
-			box.classList.toggle('filled', index < value.length);
-		});
-	}
-
-	function focusLockedPinInput() {
-		var input = $('#lockedPinInput');
-		if (input) {
-			input.focus();
-		}
-	}
-
-	function setLockedUnlockMode(mode) {
-		if (['pin', 'password'].indexOf(mode) < 0) {
-			mode = 'pin';
-		}
-		state.lockedUnlockMode = mode;
-		if ($('#lockedPassword')) {
-			$('#lockedPassword').value = '';
-		}
-		if ($('#lockedPinInput')) {
-			$('#lockedPinInput').value = '';
-			updateLockedPinBoxes();
-		}
-		updateLockedUi();
-	}
-
-	function updateLockedUi() {
-		if (!$('#lockedUnlockForm')) {
-			return;
-		}
-		var hasPin = hasQuickPin(state.savedVault);
-		if (!hasPin && state.lockedUnlockMode === 'pin') {
-			state.lockedUnlockMode = 'password';
-		}
-		var lockedCard = $('.locked-login-card');
-		if (lockedCard) {
-			lockedCard.dataset.unlockMode = state.lockedUnlockMode;
-		}
-		var pinWrap = $('#lockedPinEntryWrap');
-		var passwordWrap = $('#lockedPasswordWrap');
-		var submit = $('#unlockLockedSubmit');
-		var toggle = $('.locked-mode-toggle');
-		if (toggle) {
-			toggle.dataset.mode = state.lockedUnlockMode;
-		}
-		$$('[data-locked-mode]').forEach(function (button) {
-			var active = button.dataset.lockedMode === state.lockedUnlockMode;
-			button.classList.toggle('active', active);
-			button.disabled = button.dataset.lockedMode === 'pin' && !hasPin;
-			button.title = button.disabled ? 'Quick-unlock PIN is not enabled.' : '';
-		});
-		if ($('#lockedSavedWalletAddress')) {
-			$('#lockedSavedWalletAddress').textContent = state.savedVault ? shortAddress(state.savedVault.address) : 'None';
-		}
-		if (state.lockedUnlockMode === 'password') {
-			pinWrap.classList.add('hidden');
-			passwordWrap.classList.remove('hidden');
-			submit.classList.remove('hidden');
+	function syncTopLevelScreenVisibility(visibility) {
+		if (visibility.loginVisible) {
+			$('#loginScreen').classList.add('active');
 		} else {
-			pinWrap.classList.remove('hidden');
-			passwordWrap.classList.add('hidden');
-			submit.classList.add('hidden');
-			updateLockedPinBoxes();
+			$('#loginScreen').classList.remove('active');
 		}
-		if (window.lucide) {
-			window.lucide.createIcons();
+		$('#loginScreen').hidden = !visibility.loginVisible;
+		if (visibility.walletVisible) {
+			$('#walletScreen').classList.add('active');
+		} else {
+			$('#walletScreen').classList.remove('active');
 		}
+		$('#walletScreen').hidden = !visibility.walletVisible;
 	}
 
-	function submitLockedPin() {
-		if (state.lockedPinSubmitting) {
+	function observeTopLevelScreenVisibility() {
+		if (screenVisibilityObserver || !window.MutationObserver) {
 			return;
 		}
-		var value = lockedPinValue();
-		if (value.length !== quickPinLength(state.savedVault)) {
-			return;
-		}
-		state.lockedPinSubmitting = true;
-		$('#lockedPinEntry').classList.add('active');
-		showToast('Unlocking...');
-		unlockSavedWithPin(value).then(function () {
-			$('#lockedPinInput').value = '';
-			updateLockedPinBoxes();
-		}).catch(function (error) {
-			$('#lockedPinInput').value = '';
-			updateLockedPinBoxes();
-			showToast(error.message || 'The password or PIN was not accepted.', 'danger');
-			window.setTimeout(focusLockedPinInput, 100);
-		}).finally(function () {
-			state.lockedPinSubmitting = false;
-			$('#lockedPinEntry').classList.remove('active');
+		screenVisibilityObserver = new window.MutationObserver(function () {
+			var visibility = {
+				loginVisible: Access.accessRequired(state.mode),
+				walletVisible: Access.walletScreenVisible(state.mode)
+			};
+			var loginMatches = $('#loginScreen').classList.contains('active') === visibility.loginVisible;
+			var walletMatches = $('#walletScreen').classList.contains('active') === visibility.walletVisible;
+			if (!loginMatches || !walletMatches) {
+				syncTopLevelScreenVisibility(visibility);
+			}
 		});
-	}
-
-	function submitLockedUnlock() {
-		if (state.lockedUnlockMode === 'pin') {
-			submitLockedPin();
-			return;
-		}
-		var password = $('#lockedPassword').value.trim();
-		var button = $('#unlockLockedSubmit');
-		if (!password) {
-			showToast('Enter your wallet password.', 'danger');
-			return;
-		}
-		setBusy(button, true, 'Unlocking...');
-		unlockSavedWithPassword(password).then(function () {
-			$('#lockedPassword').value = '';
-		}).catch(function (error) {
-			showToast(error.message || 'Wallet could not be unlocked.', 'danger');
-		}).finally(function () {
-			setBusy(button, false);
-			updateLockedUi();
-		});
+		screenVisibilityObserver.observe($('#loginScreen'), { attributes: true, attributeFilter: ['class'] });
+		screenVisibilityObserver.observe($('#walletScreen'), { attributes: true, attributeFilter: ['class'] });
 	}
 
 	function updateWalletUi() {
-		var loggedIn = !!state.address;
-		if (loggedIn && state.mode !== 'locked' && (document.activeElement === $('#pinInput') || document.activeElement === $('#lockedPinInput'))) {
+		var walletVisible = Access.walletScreenVisible(state.mode);
+		if (walletVisible && document.activeElement === $('#pinInput')) {
 			document.activeElement.blur();
 		}
-		$('#loginScreen').classList.toggle('active', !loggedIn);
-		$('#walletScreen').classList.toggle('active', loggedIn);
-		$('#walletScreen').classList.toggle('wallet-locked', state.mode === 'locked');
-		document.body.classList.toggle('wallet-open', loggedIn);
+		var visibility = Access.applyScreenVisibility(document, state.mode);
+		syncTopLevelScreenVisibility(visibility);
+		observeTopLevelScreenVisibility();
+		document.body.classList.toggle('wallet-open', walletVisible);
+		document.body.dataset.walletMode = state.mode;
 		renderAvatarSurfaces();
-		if (!loggedIn) {
+		if (!walletVisible) {
 			updateAccessUi();
 			return;
 		}
@@ -1828,7 +1741,7 @@
 		});
 		startBalanceLoop();
 		resetAutoLockTimer();
-		showToast(created ? 'Wallet created. Copy your private key before closing this view.' : 'Wallet opened.');
+		showToast(created ? 'Wallet created. Save it with a password before closing it.' : 'Wallet opened.');
 		offerAvatarSetup(false);
 	}
 
@@ -1870,9 +1783,8 @@
 		state.publicKeyHex = state.savedVault.publicKey || '';
 		state.walletId = state.savedVault.walletId || '';
 		state.mode = 'locked';
-		state.lockedUnlockMode = 'pin';
+		setLoginMode(Access.initialLoginMode(state.savedVault));
 		updateWalletUi();
-		switchTab('locked');
 		if (message) {
 			showToast(message);
 		}
@@ -1886,6 +1798,7 @@
 		state.publicKeyHex = '';
 		state.walletId = '';
 		state.mode = 'closed';
+		state.loginMode = Access.initialLoginMode(state.savedVault);
 		state.balance = 0;
 		resetActivity();
 		$('#loginSecret').value = '';
@@ -2201,13 +2114,6 @@
 		$('#requirePasswordBeforeSend').checked = !!state.settings.requirePasswordBeforeSend;
 		$('#requirePinBeforeSend').checked = !!state.settings.requirePinBeforeSend;
 		$('#requireConfirmEveryTx').checked = true;
-		if ($('#savedWalletInfo')) {
-			$('#savedWalletInfo').classList.toggle('hidden', !vault);
-		}
-		if ($('#savedWalletAddress')) {
-			$('#savedWalletAddress').textContent = vault ? shortAddress(vault.address) : 'None';
-		}
-		updateLockedUi();
 		setDisabled('#addSecurityKeyButton', !webAuthnSupported(), 'Security-key approval requires HTTPS or localhost in a WebAuthn-capable browser.');
 		setDisabled('#addBackupSecurityKeyButton', !webAuthnSupported(), 'Security-key approval requires HTTPS or localhost in a WebAuthn-capable browser.');
 		renderSecurityKeys();
@@ -2668,9 +2574,6 @@
 	function prepareSend() {
 		if (!state.keys) {
 			showToast(state.mode === 'watch' ? 'Watch-only wallets cannot send.' : 'Unlock the wallet before sending.', 'danger');
-			if (state.mode === 'locked') {
-				switchTab('locked');
-			}
 			return;
 		}
 		var target = parsePaymentTarget($('#sendAddress').value);
@@ -2767,13 +2670,10 @@
 	}
 
 	function switchTab(name) {
-		if (name === 'send' && state.mode === 'locked') {
-			showToast('Unlock the wallet before sending.', 'danger');
-			name = 'locked';
-		}
+		if (!Access.walletScreenVisible(state.mode)) { return; }
 		if (name === 'keylink' && !state.keys) {
 			showToast('Open and unlock a SUGAR wallet before using Keylink.', 'danger');
-			name = state.mode === 'locked' ? 'locked' : 'activity';
+			name = 'activity';
 		}
 		$$('.panel').forEach(function (panel) {
 			panel.classList.toggle('active', panel.dataset.panel === name);
@@ -3353,6 +3253,10 @@
 		$$('[data-login-mode]').forEach(function (button) {
 			button.addEventListener('click', function () {
 				setLoginMode(button.dataset.loginMode);
+				var availability = Access.loginModeAvailability(state.loginMode, state.savedVault);
+				if (!availability.available) {
+					return;
+				}
 				if (state.loginMode === 'pin') {
 					focusPinInput();
 				} else {
@@ -3407,59 +3311,6 @@
 		$('#loginForm').addEventListener('submit', function (event) {
 			event.preventDefault();
 			submitLogin();
-		});
-
-		$$('[data-locked-mode]').forEach(function (button) {
-			button.addEventListener('click', function () {
-				if (button.disabled) {
-					return;
-				}
-				setLockedUnlockMode(button.dataset.lockedMode);
-				if (state.lockedUnlockMode === 'pin') {
-					focusLockedPinInput();
-				} else {
-					$('#lockedPassword').focus();
-				}
-			});
-		});
-
-		$('#lockedPinEntry').addEventListener('click', focusLockedPinInput);
-		$('#lockedPinEntry').addEventListener('keydown', function (event) {
-			var expectedLength = quickPinLength(state.savedVault);
-			if (/^\d$/.test(event.key)) {
-				event.preventDefault();
-				$('#lockedPinInput').value = (lockedPinValue() + event.key).slice(0, expectedLength);
-				updateLockedPinBoxes();
-				if (lockedPinValue().length === expectedLength) {
-					submitLockedPin();
-				}
-			} else if (event.key === 'Backspace') {
-				event.preventDefault();
-				$('#lockedPinInput').value = lockedPinValue().slice(0, -1);
-				updateLockedPinBoxes();
-			}
-		});
-		$('#lockedPinInput').addEventListener('input', function () {
-			var expectedLength = quickPinLength(state.savedVault);
-			updateLockedPinBoxes();
-			if (lockedPinValue().length === expectedLength) {
-				submitLockedPin();
-			}
-		});
-		$('#lockedPinInput').addEventListener('focus', function () {
-			$('#lockedPinEntry').classList.add('active');
-			revealFocusedPinArea('#lockedPinEntry');
-		});
-		$('#lockedPinInput').addEventListener('blur', function () {
-			if (!state.lockedPinSubmitting) {
-				$('#lockedPinEntry').classList.remove('active');
-			}
-			window.setTimeout(syncPinViewportState, 0);
-		});
-
-		$('#lockedUnlockForm').addEventListener('submit', function (event) {
-			event.preventDefault();
-			submitLockedUnlock();
 		});
 
 		$('#menuToggle').addEventListener('click', openMenu);
@@ -4037,6 +3888,10 @@
 			showToast('Encrypted vault library failed to load.', 'danger');
 			return;
 		}
+		if (!Access) {
+			showToast('Wallet access controls failed to load.', 'danger');
+			return;
+		}
 		if (Avatar && Avatar.createAvatarManager) {
 			avatarManager = Avatar.createAvatarManager({ manifestUrl: Avatar.MANIFEST_URL });
 		}
@@ -4045,18 +3900,26 @@
 		$('#sendFee').value = state.fee;
 		$('#addressType').value = getAddressType();
 		updateBackendUi();
+		if (state.savedVault) {
+			state.address = state.savedVault.address;
+			state.publicKeyHex = state.savedVault.publicKey || '';
+			state.walletId = state.savedVault.walletId || '';
+			state.mode = 'locked';
+			state.loginMode = Access.initialLoginMode(state.savedVault);
+		} else {
+			state.mode = 'closed';
+			state.loginMode = Access.initialLoginMode(null);
+		}
 		updateWalletUi();
 		wireEvents();
 		renderSecurityUi();
 		if (state.savedVault) {
-			setLoginMode('pin');
 			refreshBalance(false);
 			startBalanceLoop();
 		} else if (state.publicWallet && state.publicWallet.address) {
 			openWatchOnly(state.publicWallet);
 		} else {
-			setLoginMode('pin');
-			switchTab('activity');
+			setLoginMode(Access.initialLoginMode(null));
 		}
 		if (window.lucide) {
 			window.lucide.createIcons();

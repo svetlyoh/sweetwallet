@@ -222,6 +222,10 @@ main {
 	display: block;
 }
 
+.screen[hidden] {
+	display: none !important;
+}
+
 .about-footer {
 	margin-top: clamp(220px, 34svh, 340px);
 	padding: 9px 12px;
@@ -400,7 +404,6 @@ main {
 }
 
 #pinEntryWrap,
-#lockedPinEntryWrap,
 .login-secret-wrap {
 	min-height: 112px;
 	margin-bottom: 0;
@@ -453,14 +456,6 @@ main {
 
 .login-mode-toggle[data-mode="privateKey"] .mode-slider {
 	transform: translateX(200%);
-}
-
-.locked-mode-toggle {
-	grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.locked-mode-toggle .mode-slider {
-	width: calc((100% - 8px) / 2);
 }
 
 .mode-pill {
@@ -548,6 +543,26 @@ main {
 	font-weight: 400;
 }
 
+.new-wallet-notice {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin: 0 0 16px;
+	padding: 13px 14px;
+	border: 0;
+	border-radius: 18px;
+	background: rgba(137, 230, 159, 0.09);
+	color: rgba(232, 255, 239, 0.78);
+	font-size: 0.78rem;
+	line-height: 1.4;
+}
+
+.new-wallet-notice svg {
+	flex: 0 0 auto;
+	width: 18px;
+	color: #a6f7ba;
+}
+
 .login-card .notice.saved-wallet-note {
 	margin: 0 0 30px;
 }
@@ -559,41 +574,6 @@ main {
 
 .login-card .notice.login-helper-note {
 	margin-top: 28px;
-}
-
-.panel.locked-panel {
-	padding: 0;
-	border: 0;
-	background: transparent;
-	box-shadow: none;
-}
-
-#walletScreen .panel.locked-panel {
-	padding: 0;
-	border: 0;
-	background: transparent;
-	box-shadow: none;
-}
-
-.locked-login-card {
-	margin-top: 0;
-}
-
-.locked-title-row {
-	display: block;
-}
-
-#walletScreen.wallet-locked .primary-actions,
-#walletScreen.wallet-locked .wallet-card {
-	display: none;
-}
-
-#walletScreen.wallet-locked .wallet-layout {
-	margin-top: 22px;
-}
-
-#walletScreen.wallet-locked .panel:not(.locked-panel) {
-	display: none;
 }
 
 .form-row {
@@ -2273,7 +2253,7 @@ main {
 	position: relative;
 	overflow: hidden;
 	min-height: 0;
-	margin-top: 12px;
+	margin-top: 8px;
 	padding: 24px 20px 20px;
 	border-color: rgba(196, 255, 214, 0.13);
 	background:
@@ -2305,7 +2285,7 @@ main {
 
 .login-title-row {
 	align-items: start;
-	margin-bottom: 24px;
+	margin-bottom: 14px;
 }
 
 .login-heading {
@@ -2331,14 +2311,14 @@ main {
 
 .login-title {
 	color: white;
-	font-size: 1.6rem;
+	font-size: 1.15rem;
 	letter-spacing: -0.045em;
 	line-height: 1;
 }
 
 .login-copy {
 	max-width: 300px;
-	margin-top: 9px;
+	margin-top: 5px;
 	color: rgba(235, 255, 242, 0.7);
 	font-size: 0.86rem;
 	line-height: 1.5;
@@ -2368,7 +2348,6 @@ main {
 }
 
 #pinEntryWrap,
-#lockedPinEntryWrap,
 .login-secret-wrap {
 	min-height: 104px;
 }
@@ -2407,10 +2386,6 @@ main {
 	border-radius: 14px;
 	background: linear-gradient(180deg, #f7fff9, #e7f8ec);
 	box-shadow: 0 8px 22px rgba(0, 18, 11, 0.28);
-}
-
-.locked-mode-toggle .mode-slider {
-	width: calc((100% - 10px) / 2);
 }
 
 .mode-pill,
@@ -2640,9 +2615,9 @@ select {
 }
 
 .login-avatar-preview {
-	width: 126px;
-	height: 112px;
-	border-radius: 28px;
+	width: 114px;
+	height: 92px;
+	border-radius: 24px;
 	background: #071d13;
 	box-shadow:
 		0 0 0 5px rgba(123, 227, 143, 0.08),
@@ -2653,7 +2628,7 @@ select {
 	display: grid;
 	gap: 3px;
 	min-width: 0;
-	margin: 0 0 18px;
+	margin: 0 0 14px;
 	color: rgba(235, 255, 242, 0.84);
 	font-size: 0.84rem;
 	font-weight: 700;
@@ -2675,13 +2650,21 @@ select {
 
 #loginScreen.saved-wallet-login .login-title-row {
 	display: block;
-	margin-bottom: 8px;
+	margin-bottom: 6px;
 	text-align: center;
 }
 
 #loginScreen.saved-wallet-login .login-eyebrow,
 #loginScreen.saved-wallet-login .login-copy {
 	display: none;
+}
+
+.login-mode-notice {
+	margin: -8px 0 12px;
+	color: rgba(232, 255, 239, 0.72);
+	font-size: 0.78rem;
+	line-height: 1.4;
+	text-align: center;
 }
 
 .new-wallet-button {
@@ -2710,46 +2693,31 @@ select {
 	height: 21px;
 }
 
-.locked-title-row {
-	display: grid;
-	gap: 8px;
-	margin-bottom: 0;
-	text-align: center;
-}
-
-.locked-title-row .wallet-unlock-summary {
-	margin-bottom: 18px;
-}
-
-.locked-login-card .login-helper-note {
-	margin-top: 14px;
-}
-
 @media (max-width: 520px) {
 	.login-card {
 		padding: 18px 18px 16px;
+		margin-top: 8px;
 	}
 
 	.login-avatar-preview {
-		width: 118px;
-		height: 104px;
-		border-radius: 26px;
+		width: 112px;
+		height: 90px;
+		border-radius: 24px;
 	}
 
 	.login-avatar-wrap {
-		margin-bottom: 10px;
+		margin-bottom: 8px;
 	}
 
 	.login-title {
-		font-size: 1.6rem;
+		font-size: 1.15rem;
 	}
 
 	.wallet-unlock-summary {
-		margin-bottom: 16px;
+		margin-bottom: 14px;
 	}
 
-	#pinEntryWrap,
-	#lockedPinEntryWrap {
+	#pinEntryWrap {
 		min-height: 88px;
 	}
 
@@ -2806,15 +2774,15 @@ body.pin-focused .brand-subtitle {
 }
 
 body.pin-focused .login-card {
-	margin-top: 6px;
+	margin-top: 4px;
 	padding-top: 14px;
 	padding-bottom: 12px;
 }
 
 body.pin-focused .login-avatar-preview {
-	width: 104px;
-	height: 90px;
-	border-radius: 22px;
+	width: 96px;
+	height: 76px;
+	border-radius: 20px;
 }
 
 body.pin-focused .login-avatar-wrap {
@@ -2822,11 +2790,10 @@ body.pin-focused .login-avatar-wrap {
 }
 
 body.pin-focused .login-title {
-	font-size: 1.28rem;
+	font-size: 1.08rem;
 }
 
-body.pin-focused .wallet-unlock-summary,
-body.pin-focused .locked-title-row .wallet-unlock-summary {
+body.pin-focused .wallet-unlock-summary {
 	gap: 2px;
 	margin-bottom: 12px;
 }
@@ -2835,8 +2802,7 @@ body.pin-focused .login-field-row {
 	gap: 12px;
 }
 
-body.pin-focused #pinEntryWrap,
-body.pin-focused #lockedPinEntryWrap {
+body.pin-focused #pinEntryWrap {
 	min-height: 78px;
 }
 
@@ -2879,9 +2845,9 @@ body.keyboard-open .about-footer {
 	}
 
 	.login-avatar-preview {
-		width: 110px;
-		height: 98px;
-		border-radius: 24px;
+		width: 104px;
+		height: 86px;
+		border-radius: 22px;
 	}
 }
 
