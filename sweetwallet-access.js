@@ -22,6 +22,16 @@
 		return 'password';
 	}
 
+	function loginModeTransition(currentMode, requestedMode, savedVault) {
+		var mode = ['pin', 'password'].indexOf(requestedMode) >= 0 ?
+			requestedMode : initialLoginMode(savedVault);
+		return Object.freeze({
+			mode: mode,
+			changed: mode !== currentMode,
+			clearPassword: mode !== currentMode
+		});
+	}
+
 	function accessExperience(mode, savedVault, requestedView) {
 		if (walletScreenVisible(mode)) { return 'wallet'; }
 		if (requestedView === 'import' && !savedVault) { return 'import'; }
@@ -96,6 +106,7 @@
 		accessRequired: accessRequired,
 		walletScreenVisible: walletScreenVisible,
 		initialLoginMode: initialLoginMode,
+		loginModeTransition: loginModeTransition,
 		accessExperience: accessExperience,
 		loginModeAvailability: loginModeAvailability,
 		loginPresentation: loginPresentation,

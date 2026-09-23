@@ -78,6 +78,26 @@ test('login mode switches expose the requested usable control and describe unava
 	assert.match(unavailablePassword.availability.message, /No saved wallet/);
 });
 
+test('reselecting Password preserves the typed credential while a real mode change clears stale input', () => {
+	const duplicatePasswordActivation = Access.loginModeTransition('password', 'password', savedWithPin);
+	assert.equal(duplicatePasswordActivation.mode, 'password');
+	assert.equal(duplicatePasswordActivation.changed, false);
+	assert.equal(duplicatePasswordActivation.clearPassword, false);
+
+	const switchFromPin = Access.loginModeTransition('pin', 'password', savedWithPin);
+	assert.equal(switchFromPin.mode, 'password');
+	assert.equal(switchFromPin.changed, true);
+	assert.equal(switchFromPin.clearPassword, true);
+
+	const fallback = Access.loginModeTransition('password', 'unexpected', savedWithPin);
+	assert.equal(fallback.mode, 'pin');
+	assert.equal(fallback.clearPassword, true);
+
+	const client = fs.readFileSync(path.join(__dirname, '..', 'sweetwallet.js'), 'utf8');
+	assert.match(client, /Access\.loginModeTransition\(state\.loginMode, mode, state\.savedVault\)/);
+	assert.match(client, /if \(transition\.clearPassword && \$\('#loginSecret'\)\)/);
+});
+
 test('lock-screen mode buttons activate PIN before the password keyboard can consume a touch', () => {
 	const client = fs.readFileSync(path.join(__dirname, '..', 'sweetwallet.js'), 'utf8');
 	assert.match(client, /function activateLoginMode\(mode\)[\s\S]*?Access\.loginModeAvailability\(mode, state\.savedVault\)[\s\S]*?setLoginMode\(mode\)[\s\S]*?state\.loginMode === 'pin'[\s\S]*?focusPinInput\(\)/);

@@ -1452,14 +1452,13 @@
 	}
 
 	function setLoginMode(mode) {
-		if (['pin', 'password'].indexOf(mode) < 0) {
-			mode = Access.initialLoginMode(state.savedVault);
-		}
+		var transition = Access.loginModeTransition(state.loginMode, mode, state.savedVault);
+		mode = transition.mode;
 		if (mode === 'password' && document.activeElement === $('#pinInput')) {
 			$('#pinInput').blur();
 		}
 		state.loginMode = mode;
-		if ($('#loginSecret')) {
+		if (transition.clearPassword && $('#loginSecret')) {
 			$('#loginSecret').value = '';
 		}
 		if (mode === 'password') {
