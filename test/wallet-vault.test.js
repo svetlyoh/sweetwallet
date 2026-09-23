@@ -82,6 +82,41 @@ test('one exact wallet password supports PIN setup, unlock, and password changes
 	assert.equal(await Vault.decryptWithVaultKey(changed, pinVaultKey), SAMPLE_WIF, 'the existing PIN still unlocks after changing the wallet password');
 });
 
+test('persisted vault survives lock, reload, and alternating password and PIN unlocks', async () => {
+	const password = 'correct  horse battery  staple';
+	const deviceKey = await crypto.subtle.importKey('raw', Vault.randomBytes(32), { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+	let persisted = await Vault.createVault(WALLET, password, { iterations: 1000 });
+	const vaultKey = await Vault.getVaultKeyBytes(persisted, password);
+	persisted.quickUnlock = await Vault.wrapVaultKeyForPin(vaultKey, '123456', deviceKey, persisted);
+	persisted.quickUnlock.pinLength = 6;
+	// JSON serialization models the browser-storage read performed after a page reload.
+	persisted = JSON.parse(JSON.stringify(persisted));
+	const protectedBeforeLock = {
+		wrappedVaultKey: JSON.parse(JSON.stringify(persisted.wrappedVaultKey)),
+		cipher: JSON.parse(JSON.stringify(persisted.cipher)),
+		walletId: persisted.walletId,
+		createdAt: persisted.createdAt,
+		address: persisted.address,
+		network: persisted.network,
+		keyType: persisted.keyType
+	};
+
+	assert.equal(await Vault.decryptVault(persisted, password), SAMPLE_WIF, 'password unlock succeeds after lock');
+	const pinKey = await Vault.unwrapVaultKeyWithPin(persisted, '123456', deviceKey);
+	assert.equal(await Vault.decryptWithVaultKey(persisted, pinKey), SAMPLE_WIF, 'PIN unlock succeeds after password unlock');
+	const reloaded = JSON.parse(JSON.stringify(persisted));
+	assert.equal(await Vault.decryptVault(reloaded, password), SAMPLE_WIF, 'password unlock succeeds after reload');
+	assert.deepEqual({
+		wrappedVaultKey: reloaded.wrappedVaultKey,
+		cipher: reloaded.cipher,
+		walletId: reloaded.walletId,
+		createdAt: reloaded.createdAt,
+		address: reloaded.address,
+		network: reloaded.network,
+		keyType: reloaded.keyType
+	}, protectedBeforeLock, 'locking does not rewrite password-protected vault fields');
+});
+
 test('accepts only 4 or 6 digit quick-unlock PINs', () => {
 	assert.equal(Vault.validatePin('1234').ok, true);
 	assert.equal(Vault.validatePin('123456').ok, true);

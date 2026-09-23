@@ -78,6 +78,13 @@ test('login mode switches expose the requested usable control and describe unava
 	assert.match(unavailablePassword.availability.message, /No saved wallet/);
 });
 
+test('lock-screen mode buttons activate PIN before the password keyboard can consume a touch', () => {
+	const client = fs.readFileSync(path.join(__dirname, '..', 'sweetwallet.js'), 'utf8');
+	assert.match(client, /function activateLoginMode\(mode\)[\s\S]*?Access\.loginModeAvailability\(mode, state\.savedVault\)[\s\S]*?setLoginMode\(mode\)[\s\S]*?state\.loginMode === 'pin'[\s\S]*?focusPinInput\(\)/);
+	assert.match(client, /button\.addEventListener\('pointerdown'[\s\S]*?event\.preventDefault\(\)[\s\S]*?activateLoginMode\(button\.dataset\.loginMode\)/);
+	assert.match(client, /button\.addEventListener\('click'[\s\S]*?event\.detail !== 0[\s\S]*?activateLoginMode\(button\.dataset\.loginMode\)/);
+});
+
 test('the invisible PIN input is contained inside the PIN cells and cannot cover Password', () => {
 	const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 	assert.match(html, /id="pinEntry"[^>]*>[\s\S]*?<input id="pinInput" class="pin-input"[\s\S]*?<\/div>\s*<\/div>\s*<div class="login-mode-toggle unlock-mode-toggle"/);
@@ -119,6 +126,15 @@ test('lock and unlock transition between the same canonical access screen and wa
 	assertView('saved', false, true);
 	assert.equal(Access.loginAvatarVisible('saved', true), false);
 	assert.equal(Access.headerAvatarVisible('saved', true, true), true);
+});
+
+test('locking clears key material without rewriting the encrypted vault', () => {
+	const client = fs.readFileSync(path.join(__dirname, '..', 'sweetwallet.js'), 'utf8');
+	const lockBody = client.match(/function lockWallet\(message\) \{([\s\S]*?)\n\t\}/);
+	assert.ok(lockBody, 'lockWallet is present');
+	assert.match(lockBody[1], /clearSensitiveMemory\(\)[\s\S]*?state\.mode = 'locked'/);
+	assert.doesNotMatch(lockBody[1], /Vault\.createVault|Vault\.changePassword|saveVaultRecord|storageJsonSet\(STORAGE\.vault/);
+	assert.match(client, /function unlockSavedWithPassword\(password\)[\s\S]*?state\.mode === 'locked' \? storageJsonGet\(STORAGE\.vault, null\)/);
 });
 
 test('watch-only wallets keep the dashboard but never present an authentication avatar in the header', () => {

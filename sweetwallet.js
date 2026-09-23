@@ -113,6 +113,11 @@
 		return Array.prototype.slice.call(document.querySelectorAll(selector));
 	};
 
+	function readWalletPassword(selector) {
+		var input = $(selector);
+		return input ? input.value : '';
+	}
+
 	function storageGet(key, fallback) {
 		try {
 			var value = window.localStorage.getItem(key);
@@ -393,16 +398,70 @@
 		state.publicWallet = storageJsonGet(STORAGE.publicWallet, null);
 	}
 
-	function saveVaultRecord(record) {
+	function validVaultRecord(record) {
+		return !!(record &&
+			record.schemaVersion === Vault.SCHEMA_VERSION &&
+			typeof record.walletId === 'string' &&
+			typeof record.address === 'string' &&
+			record.cipher &&
+			typeof record.cipher.nonce === 'string' &&
+			typeof record.cipher.ciphertext === 'string' &&
+			record.wrappedVaultKey &&
+			typeof record.wrappedVaultKey.salt === 'string' &&
+			typeof record.wrappedVaultKey.nonce === 'string' &&
+			typeof record.wrappedVaultKey.ciphertext === 'string');
+	}
+
+	function persistVaultRecord(record) {
+		if (!validVaultRecord(record) || !storageJsonSet(STORAGE.vault, record)) {
+			throw new Error('SweetWallet could not save the encrypted wallet on this browser.');
+		}
+		var persisted = storageJsonGet(STORAGE.vault, null);
+		if (!validVaultRecord(persisted)) {
+			throw new Error('SweetWallet could not read back the encrypted wallet saved by this browser.');
+		}
+		return persisted;
+	}
+
+	function applyVaultRecord(record) {
 		state.savedVault = record;
 		state.keyPrivateRevealed = false;
-		storageJsonSet(STORAGE.vault, record);
 		savePublicWallet({
 			walletId: record.walletId,
 			address: record.address,
 			publicKey: record.publicKey || '',
 			mode: 'saved',
 			updatedAt: new Date().toISOString()
+		});
+		return record;
+	}
+
+	function saveVaultRecord(record) {
+		return applyVaultRecord(persistVaultRecord(record));
+	}
+
+	function verifyVaultRecord(record, password, expectedWif) {
+		return Vault.decryptVault(record, password).then(function (verifiedWif) {
+			if (verifiedWif !== expectedWif) {
+				throw new Error('Saved wallet verification failed.');
+			}
+			return record;
+		});
+	}
+
+	function persistVerifiedVaultRecord(record, password, expectedWif) {
+		var previousRecord = storageJsonGet(STORAGE.vault, null);
+		return verifyVaultRecord(record, password, expectedWif).then(function () {
+			return persistVaultRecord(record);
+		}).then(function (persisted) {
+			return verifyVaultRecord(persisted, password, expectedWif);
+		}).then(function (persisted) {
+			return applyVaultRecord(persisted);
+		}).catch(function (error) {
+			if (validVaultRecord(previousRecord)) {
+				storageJsonSet(STORAGE.vault, previousRecord);
+			}
+			throw error;
 		});
 	}
 
@@ -680,14 +739,6 @@
 		return value.toLocaleString(undefined, {
 			minimumFractionDigits: full ? CONFIG.decimals : 4,
 			maximumFractionDigits: full ? CONFIG.decimals : 4
-		});
-	}
-
-	function formatHeaderBalance(satoshis) {
-		var value = Number(satoshis || 0) / Math.pow(10, CONFIG.decimals);
-		return value.toLocaleString(undefined, {
-			minimumFractionDigits: 6,
-			maximumFractionDigits: 6
 		});
 	}
 
@@ -1117,10 +1168,7 @@
 
 	function updateBalanceUi(loading) {
 		var display = loading ? 'Loading' : formatBalance(state.balance, state.showFullBalance);
-		var chipDisplay = loading ? 'Loading' : formatHeaderBalance(state.balance);
 		$('#balanceMain').textContent = display;
-		$('#balanceChipAmount').textContent = chipDisplay;
-		$('#balanceChipTicker').textContent = CONFIG.ticker;
 		$('#sendAvailable').textContent = loading ? 'Loading' : formatAmount(state.balance) + ' ' + CONFIG.ticker;
 		var toggle = $('#toggleBalancePrecision');
 		if (toggle) {
@@ -1420,6 +1468,22 @@
 		updateLoginUi();
 	}
 
+	function activateLoginMode(mode) {
+		var availability = Access.loginModeAvailability(mode, state.savedVault);
+		if (!availability.available) {
+			showToast(availability.message || 'That login method is not available.', 'danger');
+			return;
+		}
+		setLoginMode(mode);
+		window.requestAnimationFrame(function () {
+			if (state.loginMode === 'pin') {
+				focusPinInput();
+			} else if ($('#loginSecret')) {
+				$('#loginSecret').focus();
+			}
+		});
+	}
+
 	function pinValue() {
 		return normalizePin($('#pinInput') && $('#pinInput').value, quickPinLength(state.savedVault));
 	}
@@ -1585,7 +1649,7 @@
 			submitPinLogin();
 			return;
 		}
-		var value = $('#loginSecret').value;
+		var value = readWalletPassword('#loginSecret');
 		var button = $('#loginSubmit');
 		if (!value) {
 			showToast('Enter your wallet password.', 'danger');
@@ -1922,8 +1986,8 @@
 	}
 
 	function unlockSavedWithPassword(password) {
-		var record = state.savedVault || storageJsonGet(STORAGE.vault, null);
-		if (!record) {
+		var record = state.mode === 'locked' ? storageJsonGet(STORAGE.vault, null) : (state.savedVault || storageJsonGet(STORAGE.vault, null));
+		if (!validVaultRecord(record)) {
 			return Promise.reject(new Error('No saved wallet was found on this device.'));
 		}
 		return Vault.decryptVault(record, password).then(function (wif) {
@@ -2002,18 +2066,25 @@
 		if (cryptoError) {
 			return Promise.reject(new Error(cryptoError));
 		}
+		var activeWif = state.keys.toWIF();
 		return Vault.createVault({
-			privateKeyWif: state.keys.toWIF(),
+			privateKeyWif: activeWif,
 			address: state.address,
 			publicKey: state.publicKeyHex,
 			walletId: state.walletId || undefined,
 			network: Vault.NETWORK
 		}, password).then(function (record) {
+			return persistVerifiedVaultRecord(record, password, activeWif);
+		}).then(function (record) {
 			state.walletId = record.walletId;
-			saveVaultRecord(record);
 			state.mode = 'saved';
 			updateWalletUi();
 			return record;
+		}).catch(function (error) {
+			if (/verification|could not save|could not read back/i.test((error && error.message) || '')) {
+				throw new Error('SweetWallet could not verify the encrypted wallet saved by this browser. Your wallet is still open. Back up your private key before closing this page.');
+			}
+			throw error;
 		});
 	}
 
@@ -3035,17 +3106,22 @@
 			showToast('Save the wallet before changing its password.', 'danger');
 			return;
 		}
-		var currentPassword = $('#currentPassword').value;
-		var newPassword = $('#newPassword').value;
-		var confirmPassword = $('#newPasswordConfirm').value;
+		var currentPassword = readWalletPassword('#currentPassword');
+		var newPassword = readWalletPassword('#newPassword');
+		var confirmPassword = readWalletPassword('#newPasswordConfirm');
 		if (newPassword !== confirmPassword) {
 			showToast('New wallet passwords do not match.', 'danger');
 			return;
 		}
 		var button = $('#changePasswordButton');
 		setBusy(button, true, 'Updating...');
+		var activeWif = state.keys && state.keys.toWIF();
 		Vault.changePassword(state.savedVault, currentPassword, newPassword).then(function (record) {
-			saveVaultRecord(record);
+			if (!activeWif) {
+				throw new Error('Unlock the wallet before changing its password.');
+			}
+			return persistVerifiedVaultRecord(record, newPassword, activeWif);
+		}).then(function () {
 			closeChangePasswordFlow();
 			showToast('Wallet password changed. Your Quick PIN still works.');
 		}).catch(function (error) {
@@ -3204,7 +3280,7 @@
 			return;
 		}
 		if (state.disconnectFlow.step === 'password') {
-			var password = $('#disconnectPassword').value;
+			var password = readWalletPassword('#disconnectPassword');
 			if (!password) {
 				showToast('Enter your wallet password.', 'danger');
 				return;
@@ -3321,8 +3397,8 @@
 			return;
 		}
 		if (state.pinSetup.step === 'password') {
-			var password = $('#setupWalletPassword').value;
-			var confirmPassword = $('#setupWalletPasswordConfirm').value;
+			var password = readWalletPassword('#setupWalletPassword');
+			var confirmPassword = readWalletPassword('#setupWalletPasswordConfirm');
 			if (password !== confirmPassword) {
 				showToast('Wallet passwords do not match.', 'danger');
 				return;
@@ -3355,7 +3431,7 @@
 			return;
 		}
 
-		var passwordForPin = state.pinSetup.password || $('#setupPinPassword').value;
+		var passwordForPin = state.pinSetup.password || readWalletPassword('#setupPinPassword');
 		var expectedLength = state.pinSetup.pinLength === 6 ? 6 : 4;
 		var pin = normalizePin($('#setupQuickPin').value, expectedLength);
 		var confirmPin = normalizePin($('#setupQuickPinConfirm').value, expectedLength);
@@ -3511,17 +3587,19 @@
 		syncPinViewportState();
 
 		$$('[data-login-mode]').forEach(function (button) {
-			button.addEventListener('click', function () {
-				setLoginMode(button.dataset.loginMode);
-				var availability = Access.loginModeAvailability(state.loginMode, state.savedVault);
-				if (!availability.available) {
+			button.addEventListener('pointerdown', function (event) {
+				if (button.disabled) {
 					return;
 				}
-				if (state.loginMode === 'pin') {
-					focusPinInput();
-				} else {
-					$('#loginSecret').focus();
+				event.preventDefault();
+				activateLoginMode(button.dataset.loginMode);
+			});
+			button.addEventListener('click', function (event) {
+				// Pointer interactions already switch on pointerdown; this preserves keyboard and assistive-technology activation.
+				if (event.detail !== 0) {
+					return;
 				}
+				activateLoginMode(button.dataset.loginMode);
 			});
 		});
 
@@ -3650,10 +3728,6 @@
 			var open = detail.classList.toggle('hidden') === false;
 			toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
 			toggle.closest('.activity-item').classList.toggle('open', open);
-		});
-
-		$('#refreshBalance').addEventListener('click', function () {
-			refreshBalance(true);
 		});
 
 		$('#toggleBalancePrecision').addEventListener('click', function () {

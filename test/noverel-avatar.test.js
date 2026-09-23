@@ -99,11 +99,13 @@ test('automatic balance loading does not expose raw backend errors after login',
 	assert.doesNotMatch(client, /showToast\(error\.message \|\| 'Balance refresh failed\.'/);
 });
 
-test('top bar removes two of eight balance decimals and shows its avatar only when unlocked', () => {
+test('top bar keeps its avatar and menu while the wallet balance stays in the wallet card', () => {
 	const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 	const client = fs.readFileSync(path.join(root, 'sweetwallet.js'), 'utf8');
-	assert.match(html, /id="refreshBalance"[\s\S]*?id="headerAvatarButton"[\s\S]*?id="menuToggle"/);
-	assert.match(client, /function formatHeaderBalance\(satoshis\)[\s\S]*?minimumFractionDigits: 6,[\s\S]*?maximumFractionDigits: 6/);
+	assert.match(html, /id="headerAvatarButton"[\s\S]*?id="menuToggle"/);
+	assert.match(html, /id="balanceMain"[\s\S]*?SUGAR/);
+	assert.doesNotMatch(html, /id="refreshBalance"|id="balanceChipAmount"|id="balanceChipTicker"/);
+	assert.doesNotMatch(client, /formatHeaderBalance|balanceChipAmount|balanceChipTicker|#refreshBalance/);
 	assert.match(client, /Access\.headerAvatarVisible\(state\.mode, state\.keys, entry\)/);
 	assert.match(client, /Access\.loginAvatarVisible\(state\.mode, entry\)/);
 	assert.match(client, /panel\.classList\.toggle\('active', panel\.dataset\.panel === name\);[\s\S]*?renderAvatarSurfaces\(\)/);

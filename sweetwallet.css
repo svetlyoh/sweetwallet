@@ -166,37 +166,6 @@ main {
 	object-fit: cover;
 }
 
-.balance-chip {
-	min-width: 92px;
-	min-height: 48px;
-	padding: 7px 10px;
-	border: 1px solid rgba(255, 255, 255, 0.22);
-	border-radius: 8px;
-	background: rgba(255, 255, 255, 0.1);
-	color: white;
-	text-align: right;
-}
-
-.balance-chip .amount {
-	display: block;
-	max-width: 118px;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	font-size: 0.9rem;
-	font-weight: 800;
-	line-height: 1.05;
-	white-space: nowrap;
-}
-
-.balance-chip .ticker {
-	display: block;
-	margin-top: 2px;
-	color: rgba(255, 255, 255, 0.72);
-	font-size: 0.66rem;
-	font-weight: 700;
-	text-transform: uppercase;
-}
-
 .icon-button {
 	display: inline-grid;
 	place-items: center;
@@ -1344,6 +1313,10 @@ select:focus {
 	color: #0a7a43;
 }
 
+#changePasswordModal label {
+	color: #fff;
+}
+
 .security-compact {
 	margin-top: 12px;
 }
@@ -2359,7 +2332,6 @@ main {
 	color: rgba(230, 255, 239, 0.66);
 }
 
-.balance-chip,
 .icon-button {
 	border: 1px solid rgba(190, 255, 209, 0.16);
 	border-radius: 18px;
@@ -2368,15 +2340,8 @@ main {
 	backdrop-filter: blur(16px);
 }
 
-.balance-chip {
-	min-width: 90px;
-	padding-inline: 12px;
-}
-
 .icon-button:hover,
-.icon-button:focus-visible,
-.balance-chip:hover,
-.balance-chip:focus-visible {
+.icon-button:focus-visible {
 	background: rgba(199, 255, 215, 0.16);
 }
 
@@ -2941,10 +2906,6 @@ select {
 		border-radius: 15px;
 	}
 
-	.balance-chip {
-		min-width: 82px;
-		padding-inline: 9px;
-	}
 }
 
 @media (max-width: 520px) {
@@ -3047,7 +3008,6 @@ body.keyboard-open .about-footer {
 }
 
 @media (prefers-reduced-transparency: reduce) {
-	.balance-chip,
 	.icon-button,
 	.login-card,
 	#walletScreen .wallet-card,
