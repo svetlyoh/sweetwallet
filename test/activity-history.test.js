@@ -53,6 +53,63 @@ test('a later retry can replace a previous complete-detail failure', async () =>
 	assert.deepEqual(second.records.map((record) => record.txid), ['retry']);
 });
 
+test('transient detail failures receive a paced final retry before becoming partial', async () => {
+	let calls = 0;
+	const result = await Activity.loadTransactionDetails(['eventual'], async (txid) => {
+		calls += 1;
+		if (calls < 3) throw new Error('temporary fault');
+		return { txid };
+	}, (tx) => tx, 1, { attempts: 3, delayMs: 0 });
+	assert.equal(calls, 3);
+	assert.deepEqual(result.records.map((record) => record.txid), ['eventual']);
+	assert.deepEqual(result.failedTxids, []);
+});
+
+test('history-level retry recovers without turning a brief outage into an empty activity screen', async () => {
+	let calls = 0;
+	const result = await Activity.retryTask(async () => {
+		calls += 1;
+		if (calls < 3) throw new Error('history unavailable');
+		return ['tx-1'];
+	}, 3, 0);
+	assert.equal(calls, 3);
+	assert.deepEqual(result, ['tx-1']);
+});
+
+test('refresh keeps cached rows for details that are temporarily unavailable', () => {
+	const previous = [{ txid: 'old-a', confirmations: 2 }, { txid: 'old-b', confirmations: 4 }];
+	const fresh = [{ txid: 'old-a', confirmations: 3 }];
+	const merged = Activity.mergeRefreshRecords(['old-a', 'old-b'], fresh, previous);
+	assert.deepEqual(merged, [{ txid: 'old-a', confirmations: 3 }, { txid: 'old-b', confirmations: 4 }]);
+});
+
+test('an unpaged fallback cannot pretend its first page is a later requested page', () => {
+	const firstPage = { result: { tx: Array.from({ length: 10 }, (_, index) => 'tx-' + index), txcount: 56 } };
+	const completeHistory = { result: { tx: Array.from({ length: 56 }, (_, index) => 'tx-' + index), txcount: 56 } };
+	assert.equal(Activity.canUseUnpagedHistory(firstPage, 0), true);
+	assert.equal(Activity.canUseUnpagedHistory(firstPage, 10), false);
+	assert.equal(Activity.canUseUnpagedHistory(completeHistory, 10), true);
+});
+
+test('normalizes a batch Esplora transaction without inventing a confirmation count', () => {
+	const record = Activity.normalizeEsploraTransaction({
+		txid: 'batch-tx',
+		fee: 1000,
+		status: { confirmed: true, block_height: 42, block_time: 123456 },
+		vin: [{ prevout: { value: 9000, scriptpubkey_address: 'sender' } }],
+		vout: [
+			{ value: 7000, scriptpubkey_address: 'wallet' },
+			{ value: 1000, scriptpubkey_address: 'change' }
+		]
+	}, 'wallet');
+	assert.equal(record.net, 7000);
+	assert.equal(record.fee, 1000);
+	assert.equal(record.confirmed, true);
+	assert.equal(record.confirmations, null);
+	assert.equal(record.height, 42);
+	assert.deepEqual(record.detailAddresses, ['sender']);
+});
+
 test('distinguishes successful empty history, partial history, and a failed history request', () => {
 	assert.equal(Activity.activityStatus(true, 0, 0), 'loaded');
 	assert.equal(Activity.activityStatus(true, 4, 1), 'partial');

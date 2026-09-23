@@ -685,13 +685,18 @@
 
 	function requestHistoryPage(address, offset) {
 		var path = '/history/' + encodeURIComponent(address);
-		return requestApi(path + '?offset=' + encodeURIComponent(offset)).then(function (data) {
-			return { data: data, supportsOffset: true };
-		}).catch(function () {
-			return requestApi(path).then(function (data) {
-				return { data: data, supportsOffset: false };
+		return Activity.retryTask(function () {
+			return requestApi(path + '?offset=' + encodeURIComponent(offset)).then(function (data) {
+				return { data: data, supportsOffset: true };
+			}).catch(function () {
+				return requestApi(path).then(function (data) {
+					if (!Activity.canUseUnpagedHistory(data, offset)) {
+						throw new Error('The fallback history response did not contain the requested page.');
+					}
+					return { data: data, supportsOffset: false };
+				});
 			});
-		});
+		}, 3, 350);
 	}
 
 	function requestBalance(address) {
@@ -1239,6 +1244,7 @@
 			fee: fee,
 			time: tx.time || tx.blocktime || 0,
 			confirmations: Number(tx.confirmations || 0),
+			confirmed: Number(tx.confirmations || 0) > 0,
 			height: tx.height || 0,
 			detailLabel: received ? 'From' : 'To',
 			detailAddresses: received ? fromAddresses : toAddresses
@@ -1276,11 +1282,12 @@
 		summary.textContent = state.activity.records.length + ' of ' + state.activity.total + ' transactions' + (state.activity.status === 'partial' ? ' (some unavailable)' : '');
 		list.innerHTML = partialNote + state.activity.records.map(function (record, index) {
 			var received = record.net >= 0;
-			var pending = record.confirmations <= 0;
+			var pending = record.confirmed === false || record.confirmations === 0;
 			var rowClass = pending ? 'pending' : (received ? 'received' : 'sent');
 			var title = pending ? 'Pending transaction' : (received ? 'Received SUGAR' : 'Sent SUGAR');
 			var amountPrefix = record.net > 0 ? '+' : '';
 			var feeText = record.fee > 0 ? 'Fee ' + formatAmount(record.fee) : 'Fee 0';
+			var confirmationText = Number.isFinite(record.confirmations) ? record.confirmations + ' conf' : (record.confirmed ? 'Confirmed' : 'Pending');
 			var detailId = 'activity-detail-' + index;
 			var detailAddresses = record.detailAddresses && record.detailAddresses.length ? record.detailAddresses : ['Unknown'];
 			var addressHtml = detailAddresses.map(function (address) {
@@ -1305,7 +1312,7 @@
 					'<div class="activity-detail-label mt">Transaction</div>' +
 					'<div class="activity-address">' + escapeHtml(record.txid) + '</div>' +
 					'<div class="activity-detail-grid">' +
-						'<span><span class="activity-detail-label">Confirmations</span><span class="activity-detail-value">' + record.confirmations + ' conf</span></span>' +
+						'<span><span class="activity-detail-label">Confirmations</span><span class="activity-detail-value">' + confirmationText + '</span></span>' +
 						'<span><span class="activity-detail-label">Fee</span><span class="activity-detail-value">' + feeText.replace(/^Fee /, '') + ' SUGAR</span></span>' +
 					'</div>' +
 					'<a class="activity-link" href="' + CONFIG.explorerTx(record.txid) + '" target="_blank" rel="noopener">View on blockchain explorer</a>' +
@@ -1318,6 +1325,53 @@
 		}
 	}
 
+	function loadActivityDetails(txids, offset, previousRecords) {
+		function loadDirect(ids) {
+			return Activity.loadTransactionDetails(ids, function (txid) {
+				return requestApi('/transaction/' + encodeURIComponent(txid)).then(function (txData) {
+					if (txData.error) { throw new Error(txData.error.message || 'Unable to load transaction.'); }
+					var transaction = txData.result || {};
+					if (!transaction.txid && !transaction.hash) { transaction.txid = txid; }
+					return transaction;
+				});
+			}, normalizeTransaction, 3, { attempts: 3, delayMs: 250 });
+		}
+
+		var anchor = offset > 0 && previousRecords.length ? previousRecords[previousRecords.length - 1].txid : '';
+		if (offset > 0 && !anchor) { return loadDirect(txids); }
+		var path = '/esplora/address/' + encodeURIComponent(state.address) + '/txs';
+		if (anchor) { path += '/chain/' + encodeURIComponent(anchor); }
+		return Activity.retryTask(function () {
+			return requestApi(path).then(function (data) {
+				if (!Array.isArray(data)) { throw new Error('The batch activity response was incomplete.'); }
+				return data;
+			});
+		}, 3, 350).then(function (transactions) {
+			var requested = {};
+			txids.forEach(function (txid) { requested[txid] = true; });
+			var batchRecords = transactions.filter(function (transaction) {
+				return transaction && requested[transaction.txid];
+			}).map(function (transaction) {
+				return Activity.normalizeEsploraTransaction(transaction, state.address);
+			});
+			var found = {};
+			batchRecords.forEach(function (record) { found[record.txid] = true; });
+			var missing = txids.filter(function (txid) { return !found[txid]; });
+			if (!missing.length) {
+				return { records: Activity.mergeRefreshRecords(txids, batchRecords, []), failedTxids: [], consumed: txids.length };
+			}
+			return loadDirect(missing).then(function (directResult) {
+				return {
+					records: Activity.mergeRefreshRecords(txids, batchRecords.concat(directResult.records), []),
+					failedTxids: directResult.failedTxids,
+					consumed: txids.length
+				};
+			});
+		}).catch(function () {
+			return loadDirect(txids);
+		});
+	}
+
 	function loadActivity(reset, showErrors) {
 		if (!state.address || state.activity.loading) {
 			return Promise.resolve();
@@ -1326,8 +1380,6 @@
 			state.activity.loaded = false;
 			state.activity.status = 'idle';
 			state.activity.offset = 0;
-			state.activity.total = 0;
-			state.activity.records = [];
 			state.activity.failedTxids = [];
 		}
 		state.activity.loading = true;
@@ -1335,6 +1387,9 @@
 		renderActivity();
 		var offset = state.activity.offset;
 		var historySupportsOffset = true;
+		var pageTxids = [];
+		var pageTotal = state.activity.total;
+		var previousRecords = state.activity.records.slice();
 		return requestHistoryPage(state.address, offset).then(function (historyPage) {
 			var data = historyPage.data;
 			historySupportsOffset = historyPage.supportsOffset;
@@ -1345,16 +1400,15 @@
 			var allTxids = Array.isArray(result.tx) ? result.tx : [];
 			var txids = historySupportsOffset ? allTxids : allTxids.slice(offset);
 			var declaredTotal = Number(result.txcount);
-			state.activity.total = Math.max(offset + txids.length, Number.isFinite(declaredTotal) ? declaredTotal : allTxids.length, state.activity.total);
-			return Activity.loadTransactionDetails(txids, function (txid) {
-				return requestApi('/transaction/' + encodeURIComponent(txid)).then(function (txData) {
-					if (txData.error) { throw new Error(txData.error.message || 'Unable to load transaction.'); }
-					var transaction = txData.result || {};
-					if (!transaction.txid && !transaction.hash) { transaction.txid = txid; }
-					return transaction;
-				});
-			}, normalizeTransaction, 4);
+			pageTxids = txids;
+			pageTotal = Math.max(offset + txids.length, Number.isFinite(declaredTotal) ? declaredTotal : allTxids.length, reset ? 0 : state.activity.total);
+			return loadActivityDetails(txids, offset, previousRecords);
 		}).then(function (detailResult) {
+			if (reset) {
+				state.activity.records = Activity.mergeRefreshRecords(pageTxids, detailResult.records, previousRecords);
+			} else {
+				state.activity.records = state.activity.records.slice();
+			}
 			var known = {};
 			state.activity.records.forEach(function (record) {
 				known[record.txid] = true;
@@ -1366,6 +1420,7 @@
 				}
 			});
 			state.activity.offset = offset + detailResult.consumed;
+			state.activity.total = pageTotal;
 			state.activity.loaded = true;
 			state.activity.failedTxids = detailResult.failedTxids;
 			state.activity.status = Activity.activityStatus(true, state.activity.records.length, detailResult.failedTxids.length);
